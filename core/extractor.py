@@ -7,6 +7,7 @@ class DependencyExtractor(ast.NodeVisitor):
         self.file_name = file_name
         self.dependencies = {}
         self.current_function = None
+        self.imports = {} 
 
     def visit_FunctionDef(self, node):
         func_id = f"{self.file_name}::{node.name}"
@@ -21,19 +22,44 @@ class DependencyExtractor(ast.NodeVisitor):
         if self.current_function:
             func_name = self._get_call_name(node)
             if func_name:
-                namespaced_call = f"{self.file_name}::{func_name}"
+                # ✅ resolve imports
+                if func_name in self.imports:
+                    namespaced_call = self.imports[func_name]
+                else:
+                    namespaced_call = f"{self.file_name}::{func_name}"
+
                 self.dependencies[self.current_function].append(namespaced_call)
+
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node):
+        module = node.module
+
+        for alias in node.names:
+            name = alias.name
+            asname = alias.asname or name
+
+            if module:
+                self.imports[asname] = f"{module}.py::{name}"
+
+        self.generic_visit(node)
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            name = alias.name
+            asname = alias.asname or name
+
+            self.imports[asname] = f"{name}.py"
 
         self.generic_visit(node)
 
     def _get_call_name(self, node):
         if isinstance(node.func, ast.Name):
             return node.func.id
-
         elif isinstance(node.func, ast.Attribute):
             return node.func.attr
-
         return None
+
 
 def extract_dependencies(file_path):
     file_name = os.path.basename(file_path)
