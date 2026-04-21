@@ -1,6 +1,7 @@
 from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
 from core.traversal import get_impact
+from core.visualizer import print_impact_tree, visualize_graph
 import os
 
 
@@ -14,10 +15,13 @@ def main():
     print("Dependencies:", deps)
     print("Graph Edges:", list(graph.edges()))
 
+    # ✅ Generate graph image FIRST
+    visualize_graph(graph)
+    print("Graph saved as graph.png")
+
     # 🔥 Impact test
     target = "a"
 
-    # ✅ Auto-resolve short names
     matches = [node for node in graph.nodes if node.endswith(f"::{target}")]
 
     if not matches:
@@ -25,10 +29,8 @@ def main():
         return
 
     for match in matches:
-        impacted = get_impact(graph, match)
-
-        print(f"\nIf '{match}' changes → impacted functions:")
-        print(impacted)
+        print(f"\nImpact Tree for '{match}':")
+        print_impact_tree(graph, match)
 
 
 if __name__ == "__main__":
