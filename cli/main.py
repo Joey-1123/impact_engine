@@ -16,10 +16,19 @@ def main():
 
     # 🔥 Impact test
     target = "a"
-    impacted = get_impact(graph, target)
 
-    print(f"\nIf '{target}' changes → impacted functions:")
-    print(impacted)
+    # ✅ Auto-resolve short names
+    matches = [node for node in graph.nodes if node.endswith(f"::{target}")]
+
+    if not matches:
+        print(f"Function '{target}' not found.")
+        return
+
+    for match in matches:
+        impacted = get_impact(graph, match)
+
+        print(f"\nIf '{match}' changes → impacted functions:")
+        print(impacted)
 
 
 if __name__ == "__main__":
