@@ -1,5 +1,6 @@
 import ast
 import os
+from core.path_resolver import module_to_file
 
 
 class DependencyExtractor(ast.NodeVisitor):
@@ -7,7 +8,7 @@ class DependencyExtractor(ast.NodeVisitor):
         self.file_name = file_name
         self.dependencies = {}
         self.current_function = None
-        self.imports = {} 
+        self.imports = {}
 
     def visit_FunctionDef(self, node):
         func_id = f"{self.file_name}::{node.name}"
@@ -22,9 +23,24 @@ class DependencyExtractor(ast.NodeVisitor):
         if self.current_function:
             func_name = self._get_call_name(node)
             if func_name:
-                # ✅ resolve imports
+
+                # 🔥 Resolve imports
                 if func_name in self.imports:
                     namespaced_call = self.imports[func_name]
+
+                elif "." in func_name:
+                    module, func = func_name.split(".", 1)
+
+                    if module in self.imports:
+                        base = self.imports[module]
+
+                        if base.endswith(".py"):
+                            namespaced_call = f"{base}::{func}"
+                        else:
+                            namespaced_call = base
+                    else:
+                        namespaced_call = f"{self.file_name}::{func}"
+
                 else:
                     namespaced_call = f"{self.file_name}::{func_name}"
 
@@ -40,7 +56,10 @@ class DependencyExtractor(ast.NodeVisitor):
             asname = alias.asname or name
 
             if module:
-                self.imports[asname] = f"{module}.py::{name}"
+                file_path = module_to_file(module)
+
+                if file_path:
+                    self.imports[asname] = f"{file_path}::{name}"
 
         self.generic_visit(node)
 
@@ -49,15 +68,25 @@ class DependencyExtractor(ast.NodeVisitor):
             name = alias.name
             asname = alias.asname or name
 
-            self.imports[asname] = f"{name}.py"
+            file_path = module_to_file(name)
+
+            if file_path:
+                self.imports[asname] = file_path
 
         self.generic_visit(node)
 
     def _get_call_name(self, node):
         if isinstance(node.func, ast.Name):
             return node.func.id
+
         elif isinstance(node.func, ast.Attribute):
+            value = node.func.value
+
+            if isinstance(value, ast.Name):
+                return f"{value.id}.{node.func.attr}"
+
             return node.func.attr
+
         return None
 
 
