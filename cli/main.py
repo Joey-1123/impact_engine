@@ -3,9 +3,9 @@ from core.graph_builder import build_graph
 from core.traversal import get_impact
 from core.visualizer import print_impact_tree, visualize_graph
 from core.analyzer import calculate_risk, find_dead_code
-from core.git_analyzer import get_changed_files, map_files_to_functions
-import os
+from core.git_analyzer import get_changed_lines, map_lines_to_functions
 import sys
+import os
 
 def analyze_command(file_path):
     deps = extract_project_dependencies(file_path)
@@ -45,31 +45,40 @@ def impact_command(file_path, target):
 
         risk = calculate_risk(graph, match)
         print(f"Risk Score for '{match}': {risk}")
+
 def diff_command():
     BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
     deps = extract_project_dependencies(BASE_DIR)
     graph = build_graph(deps)
 
-    changed_files = get_changed_files()
+    file_changes = get_changed_lines()
 
-    if not changed_files:
-        print("No changed Python files detected.")
+    if not file_changes:
+        print("No changes detected.")
         return
 
-    print("Changed files:")
-    for f in changed_files:
-        print(f"- {f}")
+    changed_funcs = []
 
-    changed_funcs = map_files_to_functions(changed_files, deps)
+    for file, lines in file_changes.items():
+        abs_path = os.path.join(BASE_DIR, file)
+
+        if not os.path.exists(abs_path):
+            continue
+
+        funcs = map_lines_to_functions(abs_path, lines)
+
+        for func in funcs:
+            namespaced = f"{os.path.basename(file)}::{func}"
+            changed_funcs.append(namespaced)
 
     if not changed_funcs:
-        print("\nNo functions detected in changed files.")
+        print("No function-level changes detected.")
         return
 
-    print("\nChanged functions:")
-    for func in changed_funcs:
-        print(f"- {func}")
+    print("Changed functions:")
+    for f in changed_funcs:
+        print(f"- {f}")
 
     for func in changed_funcs:
         print(f"\nImpact for '{func}':")
@@ -77,7 +86,6 @@ def diff_command():
 
         risk = calculate_risk(graph, func)
         print(f"Risk Score: {risk}")
-
 def main():
     BASE_DIR = os.path.dirname(os.path.dirname(__file__))
     file_path = os.path.join(BASE_DIR, "tests")
