@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Impact Engine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Cytoscape -->
+  <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+
+  <style>
+    body { font-family: system-ui, Arial; margin: 32px; background:#0b0f14; color:#e6edf3; }
+    .card { background:#111827; border-radius:14px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.3); }
+    input { padding:10px 12px; border-radius:10px; border:1px solid #374151; background:#0b1220; color:#e6edf3; }
+    button { padding:10px 14px; border-radius:10px; border:0; background:#2563eb; color:#fff; cursor:pointer; }
+    button:hover { filter:brightness(1.1); }
+    pre { background:#020617; border-radius:12px; padding:16px; overflow:auto; }
+    .row { display:flex; gap:10px; align-items:center; }
+  </style>
+</head>
+
+<body>
+
+<h1>🚀 Impact Analyzer</h1>
+
+<div class="card">
+  <div class="row">
+    <input id="func" placeholder="Function (e.g. a)" />
+    <input id="search" placeholder="Search node..." oninput="focusNode()" />
+    <button onclick="runImpact()">Run Impact</button>
+    <button onclick="runAnalyze()">Analyze Project</button>
+  </div>
+</div>
+
+<br>
+
+<div class="card">
+  <h3>Graph</h3>
+  <div id="graph" style="height:400px;"></div>
+</div>
+
+<br>
+
+<div class="card">
+  <h3>Result</h3>
+  <pre id="out">Ready…</pre>
+</div>
+
+<script>
+let cy;
+
+async function runImpact() {
+  const f = document.getElementById("func").value || "a";
+  const res = await fetch(`/api/impact/?function=${f}`);
+  const data = await res.json();
+  renderImpact(data);
+}
+
+async function runAnalyze() {
+  const res = await fetch(`/api/analyze/`);
+  const data = await res.json();
+
+  renderGraph(data.nodes, data.edges);
+
+  document.getElementById("out").innerText =
+    JSON.stringify(data.dead_code || {}, null, 2);
+}
+
+function renderImpact(data) {
+  if (!data.length) {
+    document.getElementById("out").innerText = "No matches.";
+    return;
+  }
+
+  let txt = "";
+  data.forEach(item => {
+    txt += `Function: ${item.function}\n`;
+    txt += `Risk: ${item.risk}\n`;
+    txt += `Impact:\n`;
+    item.impact.forEach(i => txt += `  - ${i}\n`);
+    txt += "\n";
+  });
+
+  document.getElementById("out").innerText = txt;
+}
+
+function renderGraph(nodes, edges) {
+  document.getElementById("graph").innerHTML = "";
+
+  cy = cytoscape({
+    container: document.getElementById('graph'),
+
+    elements: [
+      ...nodes.map(n => ({ data: { id: n.id, risk: n.risk } })),
+      ...edges.map(e => ({ data: { source: e[0], target: e[1] } }))
+    ],
+
+    // ✅ FIXED: proper style array
+    style: [
+      {
+        selector: 'node',
+        style: {
+          label: ele => ele.data('id').split("::").pop(),
+          'background-color': ele => {
+            const r = ele.data('risk');
+            if (r > 5) return '#ef4444';   // red
+            if (r > 2) return '#facc15';   // yellow
+            return '#22c55e';              // green
+          },
+          color: '#fff',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '10px',
+          width: ele => 20 + ele.degree() * 5,
+          height: ele => 20 + ele.degree() * 5,
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          width: 2,
+          'line-color': '#888',
+          'target-arrow-color': '#888',
+          'target-arrow-shape': 'triangle'
+        }
+      }
+    ],
+
+    layout: {
+      name: 'breadthfirst',
+      directed: true,
+      spacingFactor: 1.5
+    }
+  });
+
+  // click → highlight impact
+  cy.on('tap', 'node', async (evt) => {
+    const id = evt.target.id();
+    const shortName = id.split("::").pop();
+
+    const res = await fetch(`/api/impact/?function=${shortName}`);
+    const data = await res.json();
+
+    renderImpact(data);
+
+    cy.nodes().style('background-color', '#2563eb');
+
+    if (data.length) {
+      const impacted = data[0].impact;
+
+      impacted.forEach(n => {
+        cy.getElementById(n).style('background-color', '#ef4444');
+      });
+
+      cy.getElementById(id).style('background-color', '#22c55e');
+    }
+  });
+}
+
+function focusNode() {
+  if (!cy) return;
+
+  const val = document.getElementById("search").value;
+
+  const node = cy.nodes().filter(n =>
+    n.id().includes(val)
+  );
+
+  if (node.length) {
+    cy.center(node);
+    node.style("background-color", "#facc15");
+  }
+}
+</script>
+
+</body>
+</html>
