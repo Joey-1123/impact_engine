@@ -18,14 +18,22 @@ def calculate_risk(graph, target):
     return len(visited)
 
 
-def find_dead_code(graph):
+def find_dead_code(graph, entry_points):
     """
-    Dead code = nodes with no incoming edges
+    Dead code = nodes NOT reachable from entry points
     """
-    dead_nodes = []
+    visited = set()
+    stack = list(entry_points)
 
-    for node in graph.nodes():
-        if graph.in_degree(node) == 0:
-            dead_nodes.append(node)
+    while stack:
+        node = stack.pop()
+
+        if node not in visited:
+            visited.add(node)
+
+            for neighbor in graph.neighbors(node):
+                stack.append(neighbor)
+
+    dead_nodes = [node for node in graph.nodes() if node not in visited]
 
     return dead_nodes

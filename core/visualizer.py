@@ -3,14 +3,15 @@ from graphviz import Digraph
 
 def print_impact_tree(graph, target):
     reversed_graph = graph.reverse()
-    visited = set()
+    visited = set([target])   #avoide self loop
 
     def dfs(node, level=0):
         indent = "    " * level
-        print(f"{indent}├── {node}")
+        
 
         for neighbor in reversed_graph.neighbors(node):
             if neighbor not in visited:
+                print(f"{indent}├── {neighbor}")
                 visited.add(neighbor)
                 dfs(neighbor, level + 1)
 

@@ -16,11 +16,24 @@ def main():
     print("Dependencies:", deps)
     print("Graph Edges:", list(graph.edges()))
 
-    # ✅ Generate graph image FIRST
+    #  Generate graph image
     visualize_graph(graph)
     print("Graph saved as graph.png")
 
-    # 🔥 Impact test
+    #  Detect entry points
+    entry_points = [node for node in graph.nodes() if node.endswith("::main")]
+
+    if not entry_points:
+        entry_points = [node for node in graph.nodes() if graph.in_degree(node) == 0]
+
+    #  Dead code detection
+    dead = find_dead_code(graph, entry_points)
+
+    print("\nDead Code (unreachable functions):")
+    for d in dead:
+        print(f"- {d}")
+
+    #  Impact test
     target = "a"
 
     matches = [node for node in graph.nodes if node.endswith(f"::{target}")]
@@ -33,15 +46,10 @@ def main():
         print(f"\nImpact Tree for '{match}':")
         print_impact_tree(graph, match)
 
-# 🔥 Dead code detection
-    dead = find_dead_code(graph)
-
-    print("\nDead Code (unused functions):")
-    for d in dead:
-
-        print(f"- {d}")
+        #  Risk score
         risk = calculate_risk(graph, match)
-        print(f"\nRisk Score for '{match}': {risk}")
+        print(f"Risk Score for '{match}': {risk}")
+
 
 if __name__ == "__main__":
     main()
