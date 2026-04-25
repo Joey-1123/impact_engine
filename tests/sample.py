@@ -1,5 +1,5 @@
 def a():
-    pass
+    return 500
 
 def b():
     a()

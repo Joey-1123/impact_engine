@@ -20,3 +20,11 @@ build/
 
 #variable
 .env
+
+#db
+
+__pycache__/
+*.pyc
+db.sqlite3
+venv/
+.env

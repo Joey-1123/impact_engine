@@ -6,7 +6,7 @@ from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
 from core.traversal import get_impact
 from core.analyzer import calculate_risk, find_dead_code
-
+from core.git_analyzer import get_changed_files , map_files_to_functions
 BASE_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "tests"
@@ -23,7 +23,7 @@ def analyze(request):
 
     dead = find_dead_code(graph, entry_points)
 
-    # NEW: attach risk to each node
+    # 🔥 risk per node
     nodes_with_risk = []
     for node in graph.nodes():
         risk = calculate_risk(graph, node)
@@ -32,13 +32,16 @@ def analyze(request):
             "risk": risk
         })
 
+    # 🔥 ADD THIS BLOCK (YOU MISSED THIS)
+    changed_files = get_changed_files()
+    changed_funcs = map_files_to_functions(changed_files, deps)
+
     return Response({
         "nodes": nodes_with_risk,
         "edges": list(graph.edges()),
         "dead_code": dead,
+        "changed": changed_funcs   # 👈 THIS IS THE KEY
     })
-
-
 @api_view(["GET"])
 def impact(request):
     target = request.GET.get("function", "a")

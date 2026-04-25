@@ -8,13 +8,51 @@
   <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
 
   <style>
-    body { font-family: system-ui, Arial; margin: 32px; background:#0b0f14; color:#e6edf3; }
-    .card { background:#111827; border-radius:14px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,.3); }
-    input { padding:10px 12px; border-radius:10px; border:1px solid #374151; background:#0b1220; color:#e6edf3; }
-    button { padding:10px 14px; border-radius:10px; border:0; background:#2563eb; color:#fff; cursor:pointer; }
+    body {
+      font-family: system-ui, Arial;
+      margin: 32px;
+      background:#0b0f14;
+      color:#e6edf3;
+    }
+
+    .card {
+      background:#111827;
+      border-radius:14px;
+      padding:20px;
+      box-shadow:0 10px 25px rgba(0,0,0,.3);
+    }
+
+    input {
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid #374151;
+      background:#0b1220;
+      color:#e6edf3;
+    }
+
+    button {
+      padding:10px 14px;
+      border-radius:10px;
+      border:0;
+      background:#2563eb;
+      color:#fff;
+      cursor:pointer;
+    }
+
     button:hover { filter:brightness(1.1); }
-    pre { background:#020617; border-radius:12px; padding:16px; overflow:auto; }
-    .row { display:flex; gap:10px; align-items:center; }
+
+    pre {
+      background:#020617;
+      border-radius:12px;
+      padding:16px;
+      overflow:auto;
+    }
+
+    .row {
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
   </style>
 </head>
 
@@ -47,6 +85,7 @@
 
 <script>
 let cy;
+let changedNodes = [];
 
 async function runImpact() {
   const f = document.getElementById("func").value || "a";
@@ -58,6 +97,8 @@ async function runImpact() {
 async function runAnalyze() {
   const res = await fetch(`/api/analyze/`);
   const data = await res.json();
+
+  changedNodes = data.changed || [];
 
   renderGraph(data.nodes, data.edges);
 
@@ -94,26 +135,37 @@ function renderGraph(nodes, edges) {
       ...edges.map(e => ({ data: { source: e[0], target: e[1] } }))
     ],
 
-    // ✅ FIXED: proper style array
     style: [
       {
         selector: 'node',
         style: {
           label: ele => ele.data('id').split("::").pop(),
+
           'background-color': ele => {
+            const id = ele.data('id');
             const r = ele.data('risk');
-            if (r > 5) return '#ef4444';   // red
-            if (r > 2) return '#facc15';   // yellow
-            return '#22c55e';              // green
+
+            if (changedNodes.includes(id)) return '#ff00ff'; // 🔥 changed
+            if (r > 5) return '#ef4444'; // high risk
+            if (r > 2) return '#facc15'; // medium
+            return '#22c55e'; // low
           },
+
+          'border-width': ele =>
+            changedNodes.includes(ele.data('id')) ? 4 : 1,
+
+          'border-color': '#ffffff',
+
           color: '#fff',
           'text-valign': 'center',
           'text-halign': 'center',
           'font-size': '10px',
+
           width: ele => 20 + ele.degree() * 5,
           height: ele => 20 + ele.degree() * 5,
         }
       },
+
       {
         selector: 'edge',
         style: {
@@ -126,13 +178,13 @@ function renderGraph(nodes, edges) {
     ],
 
     layout: {
-      name: 'breadthfirst',
-      directed: true,
-      spacingFactor: 1.5
+      name: 'cose',
+      animate: true,
+      animationDuration: 800
     }
   });
 
-  // click → highlight impact
+  // 🔥 CLICK → impact highlight
   cy.on('tap', 'node', async (evt) => {
     const id = evt.target.id();
     const shortName = id.split("::").pop();
@@ -142,20 +194,50 @@ function renderGraph(nodes, edges) {
 
     renderImpact(data);
 
-    cy.nodes().style('background-color', '#2563eb');
+    // reset colors
+    cy.nodes().forEach(n => {
+      const r = n.data('risk');
+      if (r > 5) n.style('background-color', '#ef4444');
+      else if (r > 2) n.style('background-color', '#facc15');
+      else n.style('background-color', '#22c55e');
+    });
 
     if (data.length) {
       const impacted = data[0].impact;
 
       impacted.forEach(n => {
-        cy.getElementById(n).style('background-color', '#ef4444');
+        cy.getElementById(n).style({
+          'background-color': '#ef4444',
+          'width': 40,
+          'height': 40
+        });
       });
 
-      cy.getElementById(id).style('background-color', '#22c55e');
+      cy.getElementById(id).style({
+        'background-color': '#facc15',
+        'width': 45,
+        'height': 45
+      });
     }
+  });
+
+  // 🔥 HOVER INFO
+  cy.on('mouseover', 'node', function(evt) {
+    const node = evt.target;
+    node.style({
+      'label': node.id() + " | risk: " + node.data('risk')
+    });
+  });
+
+  cy.on('mouseout', 'node', function(evt) {
+    const node = evt.target;
+    node.style({
+      'label': node.id().split("::").pop()
+    });
   });
 }
 
+// 🔍 SEARCH
 function focusNode() {
   if (!cy) return;
 
