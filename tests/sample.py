@@ -6,3 +6,6 @@ def b():
 
 def c():
     b()
+
+def d():
+    e()

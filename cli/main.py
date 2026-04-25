@@ -6,6 +6,7 @@ from core.analyzer import calculate_risk, find_dead_code
 from core.git_analyzer import get_changed_lines, map_lines_to_functions
 import sys
 import os
+import json 
 
 def analyze_command(file_path):
     deps = extract_project_dependencies(file_path)
@@ -46,7 +47,7 @@ def impact_command(file_path, target):
         risk = calculate_risk(graph, match)
         print(f"Risk Score for '{match}': {risk}")
 
-def diff_command():
+def diff_command(json_output=False):
     BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
     deps = extract_project_dependencies(BASE_DIR)
@@ -55,10 +56,14 @@ def diff_command():
     file_changes = get_changed_lines()
 
     if not file_changes:
-        print("No changes detected.")
+        if json_output:
+            print(json.dumps({"max_risk": 0, "functions": []}))
+        else:
+            print("No changes detected.")
         return
 
-    changed_funcs = []
+    results = []
+    max_risk = 0
 
     for file, lines in file_changes.items():
         abs_path = os.path.join(BASE_DIR, file)
@@ -70,22 +75,28 @@ def diff_command():
 
         for func in funcs:
             namespaced = f"{os.path.basename(file)}::{func}"
-            changed_funcs.append(namespaced)
+            risk = calculate_risk(graph, namespaced)
 
-    if not changed_funcs:
-        print("No function-level changes detected.")
+            results.append({
+                "function": namespaced,
+                "risk": risk
+            })
+
+            max_risk = max(max_risk, risk)
+
+    if json_output:
+        print(json.dumps({
+            "max_risk": max_risk,
+            "functions": results
+        }))
         return
 
+    # normal output
     print("Changed functions:")
-    for f in changed_funcs:
-        print(f"- {f}")
+    for r in results:
+        print(f"- {r['function']} (risk={r['risk']})")
 
-    for func in changed_funcs:
-        print(f"\nImpact for '{func}':")
-        print_impact_tree(graph, func)
-
-        risk = calculate_risk(graph, func)
-        print(f"Risk Score: {risk}")
+    print(f"\nMax Risk: {max_risk}")
 def main():
     BASE_DIR = os.path.dirname(os.path.dirname(__file__))
     file_path = os.path.join(BASE_DIR, "tests")
@@ -107,7 +118,8 @@ def main():
         impact_command(file_path, target)
 
     elif command == "diff":
-        diff_command()
+        json_flag = "--json" in sys.argv
+        diff_command(json_output=json_flag)
 
     else:
         print("Unknown command")
