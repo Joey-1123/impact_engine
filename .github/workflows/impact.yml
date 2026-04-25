@@ -1,0 +1,39 @@
+name: Impact Analysis
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  impact-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run impact analysis
+        run: |
+          OUTPUT=$(impact-engine diff --json)
+          echo $OUTPUT
+
+          MAX_RISK=$(echo $OUTPUT | python -c "import sys, json; print(json.load(sys.stdin)['max_risk'])")
+
+          THRESHOLD=5
+
+          if [ "$MAX_RISK" -gt "$THRESHOLD" ]; then
+            echo " CI failed: risk too high"
+            exit 1
+          fi
+
+          echo "✅ CI passed"
