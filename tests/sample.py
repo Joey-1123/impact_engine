@@ -1,5 +1,5 @@
 def a():
-    return a()
+    return z
 
 def b():
     a()

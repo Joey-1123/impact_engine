@@ -227,6 +227,15 @@
       border: 1px solid rgba(148, 163, 184, 0.08);
     }
 
+    #graph_before,
+    #graph_after {
+      width: 100%;
+      height: 350px;
+      border-radius: 16px;
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      background: rgba(2, 6, 23, 0.85);
+    }
+
     pre {
       margin: 0;
       padding: 16px;
@@ -330,6 +339,11 @@
       #graph {
         min-height: 420px;
       }
+
+      #graph_before,
+      #graph_after {
+        height: 300px;
+      }
     }
   </style>
 </head>
@@ -375,20 +389,30 @@
       <section class="card">
         <div class="card-header">
           <div>
-            <h2>Graph</h2>
-            <div class="card-meta">Node size reflects connectivity. Color reflects risk and changes.</div>
+            <h2>Timeline View</h2>
+            <div class="card-meta">Compare the before and after graph states side by side.</div>
           </div>
           <div class="legend" aria-label="Legend">
-            <span class="chip"><span class="dot low"></span>Low risk</span>
-            <span class="chip"><span class="dot medium"></span>Medium risk</span>
-            <span class="chip"><span class="dot high"></span>High risk</span>
-            <span class="chip"><span class="dot changed"></span>Changed</span>
+            <span class="chip"><span class="dot low"></span>Before</span>
+            <span class="chip"><span class="dot changed"></span>After</span>
           </div>
         </div>
         <div class="card-body">
-          <div id="graph"></div>
+          <div style="display:flex; gap:20px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:280px;">
+              <h4>Before</h4>
+              <div id="graph_before"></div>
+            </div>
+
+            <div style="flex:1; min-width:280px;">
+              <h4>After</h4>
+              <div id="graph_after"></div>
+            </div>
+          </div>
         </div>
       </section>
+
+      <div id="graph" style="display:none;" aria-hidden="true"></div>
 
       <section class="card">
         <div class="card-header">
@@ -410,6 +434,8 @@
 
   <script>
     let cy = null;
+    let cyBefore = null;
+    let cyAfter = null;
     let changedNodes = [];
     let searchTimer = null;
     let activeSelection = null;
@@ -451,6 +477,7 @@
       statusText.textContent = label || (isBusy ? "Working" : "Ready");
       impactBtn.disabled = isBusy;
       analyzeBtn.disabled = isBusy;
+      timelineBtn.disabled = isBusy;
       funcInput.disabled = isBusy;
       searchInput.disabled = isBusy;
     }
@@ -519,7 +546,7 @@
           throw new Error(`Request failed: ${res.status} ${res.statusText}`);
         }
         const data = await res.json();
-        renderTimeline(data);
+        renderDualGraph(data);
       } catch (err) {
         setOutput(`Failed to load timeline data.\n${err.message}`);
       } finally {
@@ -527,46 +554,79 @@
       }
     }
 
-    function renderTimeline(data) {
-      const before = new Set(data.before || []);
-      const after = new Set(data.after || []);
+    function renderDualGraph(data) {
+      const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+      const edges = Array.isArray(data.edges) ? data.edges : [];
+      const before = Array.isArray(data.before) ? data.before : [];
+      const after = Array.isArray(data.after) ? data.after : [];
 
-      let txt = "=== TIMELINE VIEW ===\n\n";
-
-      txt += "Added / Changed:\n";
-      after.forEach(f => {
-        if (!before.has(f)) {
-          txt += " + " + f + "\n";
-        }
-      });
-
-      txt += "\nRemoved:\n";
-      before.forEach(f => {
-        if (!after.has(f)) {
-          txt += " - " + f + "\n";
-        }
-      });
-
-      setOutput(txt);
-      highlightTimeline(after, before);
+      renderMiniGraph("graph_before", nodes, edges, before, "before");
+      renderMiniGraph("graph_after", nodes, edges, after, "after");
     }
 
-    function highlightTimeline(after, before) {
-      if (!cy) return;
+    function renderMiniGraph(containerId, nodes, edges, highlightList, mode) {
+      if (containerId === "graph_before" && cyBefore) {
+        cyBefore.destroy();
+        cyBefore = null;
+      }
 
-      cy.nodes().forEach((n) => {
-        const id = n.id();
+      if (containerId === "graph_after" && cyAfter) {
+        cyAfter.destroy();
+        cyAfter = null;
+      }
 
-        if (after.has(id) && !before.has(id)) {
-          n.style('background-color', '#22c55e');
-        }
-        else if (before.has(id) && !after.has(id)) {
-          n.style('background-color', '#ef4444');
-        }
-        else if (after.has(id)) {
-          n.style('background-color', '#a855f7');
+      const cyInstance = cytoscape({
+        container: document.getElementById(containerId),
+
+        elements: [
+          ...nodes.map(n => ({ data: { id: n } })),
+          ...edges.map(e => ({ data: { source: e[0], target: e[1] } }))
+        ],
+
+        style: [
+          {
+            selector: 'node',
+            style: {
+              label: ele => ele.data('id').split("::").pop(),
+
+              'background-color': ele => {
+                const id = ele.data('id');
+
+                if (highlightList.includes(id)) {
+                  return mode === "before"
+                    ? '#ef4444'
+                    : '#22c55e';
+                }
+
+                return '#2563eb';
+              },
+
+              color: '#fff',
+              'font-size': '8px',
+              width: 20,
+              height: 20
+            }
+          },
+          {
+            selector: 'edge',
+            style: {
+              width: 1,
+              'line-color': '#888'
+            }
+          }
+        ],
+
+        layout: {
+          name: 'cose',
+          animate: true,
+          animationDuration: 500
         }
       });
+
+      if (containerId === "graph_before") cyBefore = cyInstance;
+      if (containerId === "graph_after") cyAfter = cyInstance;
+
+      return cyInstance;
     }
 
     function renderGraph(nodes, edges) {

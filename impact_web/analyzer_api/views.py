@@ -72,16 +72,17 @@ def timeline(request):
     deps = extract_project_dependencies(BASE_DIR)
     graph = build_graph(deps)
 
-    # BEFORE = previous commit
-    before_changed = get_changed_functions(deps, "HEAD~1")
+    nodes = list(graph.nodes())
+    edges = list(graph.edges())
 
-    # AFTER = current state
+    before_changed = get_changed_functions(deps, "HEAD~1")
     after_changed = get_changed_functions(deps, "HEAD")
 
     return Response({
+        "nodes": nodes,
+        "edges": edges,
         "before": before_changed,
         "after": after_changed
     })
-
 def home(request):
     return render(request, "index.html")
