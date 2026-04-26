@@ -3,7 +3,8 @@ from core.graph_builder import build_graph
 from core.traversal import get_impact
 from core.visualizer import print_impact_tree, visualize_graph
 from core.analyzer import calculate_risk, find_dead_code
-from core.git_analyzer import get_changed_lines, map_lines_to_functions
+from core.git_analyzer import get_changed_functions
+#from core.git_analyzer import get_changed_files, map_lines_to_functions
 import sys
 import os
 import json 
@@ -53,9 +54,9 @@ def diff_command(json_output=False):
     deps = extract_project_dependencies(BASE_DIR)
     graph = build_graph(deps)
 
-    file_changes = get_changed_lines()
+    changed_funcs = get_changed_functions(deps)
 
-    if not file_changes:
+    if not changed_funcs:
         if json_output:
             print(json.dumps({"max_risk": 0, "functions": []}))
         else:
@@ -65,24 +66,15 @@ def diff_command(json_output=False):
     results = []
     max_risk = 0
 
-    for file, lines in file_changes.items():
-        abs_path = os.path.join(BASE_DIR, file)
+    for func in changed_funcs:
+        risk = calculate_risk(graph, func)
 
-        if not os.path.exists(abs_path):
-            continue
+        results.append({
+            "function": func,
+            "risk": risk
+        })
 
-        funcs = map_lines_to_functions(abs_path, lines)
-
-        for func in funcs:
-            namespaced = f"{os.path.basename(file)}::{func}"
-            risk = calculate_risk(graph, namespaced)
-
-            results.append({
-                "function": namespaced,
-                "risk": risk
-            })
-
-            max_risk = max(max_risk, risk)
+        max_risk = max(max_risk, risk)
 
     if json_output:
         print(json.dumps({
@@ -91,7 +83,6 @@ def diff_command(json_output=False):
         }))
         return
 
-    # normal output
     print("Changed functions:")
     for r in results:
         print(f"- {r['function']} (risk={r['risk']})")
