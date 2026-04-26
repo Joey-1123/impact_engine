@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+
+permissions:
+  contents: read
+  pull-requests: write
+
+
 jobs:
   impact-check:
     runs-on: ubuntu-latest
