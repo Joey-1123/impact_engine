@@ -1,258 +1,790 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Impact Engine</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Cytoscape -->
   <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
 
   <style>
-    body {
-      font-family: system-ui, Arial;
-      margin: 32px;
-      background:#0b0f14;
-      color:#e6edf3;
+    :root {
+      --bg: #07111d;
+      --bg-elev: rgba(10, 18, 32, 0.82);
+      --bg-panel: rgba(15, 23, 42, 0.92);
+      --border: rgba(148, 163, 184, 0.18);
+      --border-strong: rgba(148, 163, 184, 0.32);
+      --text: #e5eefb;
+      --muted: #93a4bf;
+      --accent: #5b8cff;
+      --accent-2: #7c3aed;
+      --good: #22c55e;
+      --warn: #facc15;
+      --bad: #ef4444;
+      --changed: #ff4fd8;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+      --radius: 20px;
     }
 
-    .card {
-      background:#111827;
-      border-radius:14px;
-      padding:20px;
-      box-shadow:0 10px 25px rgba(0,0,0,.3);
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(91, 140, 255, 0.18), transparent 28%),
+        radial-gradient(circle at 80% 0%, rgba(124, 58, 237, 0.16), transparent 26%),
+        linear-gradient(180deg, #050b13 0%, #08111d 44%, #060b14 100%);
+      overflow-x: hidden;
+    }
+
+    .shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 8px 12px;
+      border: 1px solid rgba(91, 140, 255, 0.26);
+      border-radius: 999px;
+      background: rgba(91, 140, 255, 0.08);
+      color: #cfe0ff;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.7rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.65;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr auto auto;
+      gap: 12px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) + 4px);
+      background: linear-gradient(180deg, rgba(13, 19, 33, 0.9), rgba(10, 16, 28, 0.92));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
 
     input {
-      padding:10px 12px;
-      border-radius:10px;
-      border:1px solid #374151;
-      background:#0b1220;
-      color:#e6edf3;
+      width: 100%;
+      padding: 14px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(3, 8, 18, 0.88);
+      color: var(--text);
+      outline: none;
+      transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    input::placeholder {
+      color: #64748b;
+    }
+
+    input:focus {
+      border-color: rgba(91, 140, 255, 0.7);
+      box-shadow: 0 0 0 4px rgba(91, 140, 255, 0.16);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+      flex-wrap: wrap;
     }
 
     button {
-      padding:10px 14px;
-      border-radius:10px;
-      border:0;
-      background:#2563eb;
-      color:#fff;
-      cursor:pointer;
+      border: 0;
+      padding: 14px 16px;
+      border-radius: 14px;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), #2f6bff);
+      box-shadow: 0 10px 24px rgba(47, 107, 255, 0.28);
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+      white-space: nowrap;
     }
 
-    button:hover { filter:brightness(1.1); }
+    button.secondary {
+      background: rgba(148, 163, 184, 0.12);
+      box-shadow: none;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      color: var(--text);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+      gap: 18px;
+      align-items: start;
+      margin-top: 18px;
+    }
+
+    .legend-card {
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-elev);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 18px 0 18px;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .card-meta {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .card-body {
+      padding: 18px;
+    }
+
+    #graph {
+      height: min(72vh, 760px);
+      min-height: 480px;
+      border-radius: 16px;
+      background:
+        radial-gradient(circle at top, rgba(91, 140, 255, 0.06), transparent 42%),
+        linear-gradient(180deg, rgba(2, 6, 23, 0.94), rgba(2, 6, 23, 0.7));
+      border: 1px solid rgba(148, 163, 184, 0.08);
+    }
 
     pre {
-      background:#020617;
-      border-radius:12px;
-      padding:16px;
-      overflow:auto;
+      margin: 0;
+      padding: 16px;
+      min-height: 360px;
+      max-height: 72vh;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-radius: 16px;
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      background: rgba(2, 6, 23, 0.85);
+      color: #dbe7ff;
+      line-height: 1.6;
     }
 
-    .row {
-      display:flex;
-      gap:10px;
-      align-items:center;
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.08);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .dot.low { background: var(--good); }
+    .dot.medium { background: var(--warn); }
+    .dot.high { background: var(--bad); }
+    .dot.changed { background: var(--changed); }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(147, 197, 253, 0.28);
+      border-top-color: #93c5fd;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    .spinner.active {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 1100px) {
+      .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .actions {
+        grid-column: 1 / -1;
+      }
+
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        padding: 16px;
+      }
+
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      #graph {
+        min-height: 420px;
+      }
     }
   </style>
 </head>
-
 <body>
+  <div class="shell">
+    <div class="hero">
+      <div class="eyebrow">Impact Engine</div>
+      <h1>Explore code impact with a cleaner, faster graph UI.</h1>
+      <p class="subtitle">
+        Inspect dependency risk, find affected functions, and surface changed nodes with a focused interface that stays readable on both desktop and mobile.
+      </p>
+    </div>
 
-<h1>🚀 Impact Analyzer</h1>
+    <section class="toolbar" aria-label="Impact controls">
+      <div class="field">
+        <label class="label" for="func">Function</label>
+        <input id="func" placeholder="e.g. a" autocomplete="off" spellcheck="false" />
+      </div>
 
-<div class="card">
-  <div class="row">
-    <input id="func" placeholder="Function (e.g. a)" />
-    <input id="search" placeholder="Search node..." oninput="focusNode()" />
-    <button onclick="runImpact()">Run Impact</button>
-    <button onclick="runAnalyze()">Analyze Project</button>
+      <div class="field">
+        <label class="label" for="search">Search node</label>
+        <input id="search" placeholder="Type to focus a node" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="actions">
+        <button id="impactBtn" type="button">Run Impact</button>
+        <button id="analyzeBtn" type="button" class="secondary">Analyze Project</button>
+        <button id="timelineBtn" type="button" class="secondary">Timeline</button>
+      </div>
+    </section>
+
+    <div class="card legend-card">
+      <b>Legend:</b><br>
+      <span style="color:#a855f7;">🟣 Changed</span> &nbsp;
+      <span style="color:#ef4444;">🔴 Impacted</span> &nbsp;
+      <span style="color:#facc15;">🟡 Selected</span> &nbsp;
+      <span style="color:#22c55e;">🟢 Low Risk</span> &nbsp;
+      <span style="color:#facc15;">🟡 Medium Risk</span> &nbsp;
+      <span style="color:#ef4444;">🔴 High Risk</span>
+    </div>
+
+    <div class="content">
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2>Graph</h2>
+            <div class="card-meta">Node size reflects connectivity. Color reflects risk and changes.</div>
+          </div>
+          <div class="legend" aria-label="Legend">
+            <span class="chip"><span class="dot low"></span>Low risk</span>
+            <span class="chip"><span class="dot medium"></span>Medium risk</span>
+            <span class="chip"><span class="dot high"></span>High risk</span>
+            <span class="chip"><span class="dot changed"></span>Changed</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="graph"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2>Result</h2>
+            <div class="card-meta">Impact output, dead code summary, and live node details.</div>
+          </div>
+          <div class="status" id="status">
+            <span class="spinner" id="spinner"></span>
+            <span id="statusText">Ready</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <pre id="out">Run analysis to load the graph.</pre>
+        </div>
+      </section>
+    </div>
   </div>
-</div>
 
-<br>
+  <script>
+    let cy = null;
+    let changedNodes = [];
+    let searchTimer = null;
+    let activeSelection = null;
+    let focusedSearchNode = null;
 
-<div class="card">
-  <h3>Graph</h3>
-  <div id="graph" style="height:400px;"></div>
-</div>
+    const out = document.getElementById("out");
+    const spinner = document.getElementById("spinner");
+    const statusText = document.getElementById("statusText");
+    const funcInput = document.getElementById("func");
+    const searchInput = document.getElementById("search");
+    const impactBtn = document.getElementById("impactBtn");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const timelineBtn = document.getElementById("timelineBtn");
 
-<br>
-
-<div class="card">
-  <h3>Result</h3>
-  <pre id="out">Ready…</pre>
-</div>
-
-<script>
-let cy;
-let changedNodes = [];
-
-async function runImpact() {
-  const f = document.getElementById("func").value || "a";
-  const res = await fetch(`/api/impact/?function=${f}`);
-  const data = await res.json();
-  renderImpact(data);
-}
-
-async function runAnalyze() {
-  const res = await fetch(`/api/analyze/`);
-  const data = await res.json();
-
-  changedNodes = data.changed || [];
-
-  renderGraph(data.nodes, data.edges);
-
-  document.getElementById("out").innerText =
-    JSON.stringify(data.dead_code || {}, null, 2);
-}
-
-function renderImpact(data) {
-  if (!data.length) {
-    document.getElementById("out").innerText = "No matches.";
-    return;
-  }
-
-  let txt = "";
-  data.forEach(item => {
-    txt += `Function: ${item.function}\n`;
-    txt += `Risk: ${item.risk}\n`;
-    txt += `Impact:\n`;
-    item.impact.forEach(i => txt += `  - ${i}\n`);
-    txt += "\n";
-  });
-
-  document.getElementById("out").innerText = txt;
-}
-
-function renderGraph(nodes, edges) {
-  document.getElementById("graph").innerHTML = "";
-
-  cy = cytoscape({
-    container: document.getElementById('graph'),
-
-    elements: [
-      ...nodes.map(n => ({ data: { id: n.id, risk: n.risk } })),
-      ...edges.map(e => ({ data: { source: e[0], target: e[1] } }))
-    ],
-
-    style: [
-      {
-        selector: 'node',
-        style: {
-          label: ele => ele.data('id').split("::").pop(),
-
-          'background-color': ele => {
-            const id = ele.data('id');
-            const r = ele.data('risk');
-
-            if (changedNodes.includes(id)) return '#ff00ff'; // 🔥 changed
-            if (r > 5) return '#ef4444'; // high risk
-            if (r > 2) return '#facc15'; // medium
-            return '#22c55e'; // low
-          },
-
-          'border-width': ele =>
-            changedNodes.includes(ele.data('id')) ? 4 : 1,
-
-          'border-color': '#ffffff',
-
-          color: '#fff',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'font-size': '10px',
-
-          width: ele => 20 + ele.degree() * 5,
-          height: ele => 20 + ele.degree() * 5,
-        }
-      },
-
-      {
-        selector: 'edge',
-        style: {
-          width: 2,
-          'line-color': '#888',
-          'target-arrow-color': '#888',
-          'target-arrow-shape': 'triangle'
-        }
+    impactBtn.addEventListener("click", runImpact);
+    analyzeBtn.addEventListener("click", runAnalyze);
+    timelineBtn.addEventListener("click", runTimeline);
+    funcInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runImpact();
+    });
+    searchInput.addEventListener("input", queueFocusNode);
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        searchInput.value = "";
+        clearFocus();
       }
-    ],
-
-    layout: {
-      name: 'cose',
-      animate: true,
-      animationDuration: 800
-    }
-  });
-
-  // 🔥 CLICK → impact highlight
-  cy.on('tap', 'node', async (evt) => {
-    const id = evt.target.id();
-    const shortName = id.split("::").pop();
-
-    const res = await fetch(`/api/impact/?function=${shortName}`);
-    const data = await res.json();
-
-    renderImpact(data);
-
-    // reset colors
-    cy.nodes().forEach(n => {
-      const r = n.data('risk');
-      if (r > 5) n.style('background-color', '#ef4444');
-      else if (r > 2) n.style('background-color', '#facc15');
-      else n.style('background-color', '#22c55e');
     });
 
-    if (data.length) {
-      const impacted = data[0].impact;
+    async function fetchJson(url) {
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+      }
+      return res.json();
+    }
 
-      impacted.forEach(n => {
-        cy.getElementById(n).style({
-          'background-color': '#ef4444',
-          'width': 40,
-          'height': 40
+    function setBusy(isBusy, label = "") {
+      spinner.classList.toggle("active", isBusy);
+      statusText.textContent = label || (isBusy ? "Working" : "Ready");
+      impactBtn.disabled = isBusy;
+      analyzeBtn.disabled = isBusy;
+      funcInput.disabled = isBusy;
+      searchInput.disabled = isBusy;
+    }
+
+    function setOutput(text) {
+      out.textContent = text;
+    }
+
+    function riskColor(risk) {
+      if (risk > 5) return "#ef4444";
+      if (risk > 2) return "#facc15";
+      return "#22c55e";
+    }
+
+    function formatImpact(data) {
+      if (!data || !data.length) {
+        return "No matches.";
+      }
+
+      return data.map((item) => {
+        const impact = Array.isArray(item.impact) ? item.impact : [];
+        return [
+          `Function: ${item.function}`,
+          `Risk: ${item.risk}`,
+          "Impact:",
+          ...impact.map((entry) => `  - ${entry}`),
+          ""
+        ].join("\n");
+      }).join("\n");
+    }
+
+    async function runImpact() {
+      const f = (funcInput.value || "a").trim();
+      if (!f) return;
+
+      setBusy(true, "Loading impact");
+      try {
+        const data = await fetchJson(`/api/impact/?function=${encodeURIComponent(f)}`);
+        setOutput(formatImpact(data));
+      } catch (err) {
+        setOutput(`Failed to load impact data.\n${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function runAnalyze() {
+      setBusy(true, "Analyzing project");
+      try {
+        const data = await fetchJson(`/api/analyze/`);
+        changedNodes = Array.isArray(data.changed) ? data.changed : [];
+        renderGraph(Array.isArray(data.nodes) ? data.nodes : [], Array.isArray(data.edges) ? data.edges : []);
+        setOutput(JSON.stringify(data.dead_code || {}, null, 2));
+      } catch (err) {
+        setOutput(`Failed to analyze project.\n${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function runTimeline() {
+      setBusy(true, "Loading timeline");
+      try {
+        const res = await fetch(`/api/timeline/`, { headers: { "Accept": "application/json" } });
+        if (!res.ok) {
+          throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        renderTimeline(data);
+      } catch (err) {
+        setOutput(`Failed to load timeline data.\n${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function renderTimeline(data) {
+      const before = new Set(data.before || []);
+      const after = new Set(data.after || []);
+
+      let txt = "=== TIMELINE VIEW ===\n\n";
+
+      txt += "Added / Changed:\n";
+      after.forEach(f => {
+        if (!before.has(f)) {
+          txt += " + " + f + "\n";
+        }
+      });
+
+      txt += "\nRemoved:\n";
+      before.forEach(f => {
+        if (!after.has(f)) {
+          txt += " - " + f + "\n";
+        }
+      });
+
+      setOutput(txt);
+      highlightTimeline(after, before);
+    }
+
+    function highlightTimeline(after, before) {
+      if (!cy) return;
+
+      cy.nodes().forEach((n) => {
+        const id = n.id();
+
+        if (after.has(id) && !before.has(id)) {
+          n.style('background-color', '#22c55e');
+        }
+        else if (before.has(id) && !after.has(id)) {
+          n.style('background-color', '#ef4444');
+        }
+        else if (after.has(id)) {
+          n.style('background-color', '#a855f7');
+        }
+      });
+    }
+
+    function renderGraph(nodes, edges) {
+      if (cy) {
+        cy.destroy();
+        cy = null;
+      }
+
+      const container = document.getElementById("graph");
+      container.innerHTML = "";
+
+      cy = cytoscape({
+        container,
+        elements: [
+          ...nodes.map((n) => ({ data: { id: n.id, risk: Number(n.risk) || 0 } })),
+          ...edges.map((e) => ({ data: { source: e[0], target: e[1] } }))
+        ],
+        style: [
+          {
+            selector: "node",
+            style: {
+              label: (ele) => ele.data("id").split("::").pop(),
+              "background-color": (ele) => {
+                const id = ele.data("id");
+                if (changedNodes.includes(id)) return "#ff4fd8";
+                return riskColor(ele.data("risk"));
+              },
+              "border-width": (ele) => changedNodes.includes(ele.data("id")) ? 3 : 1,
+              "border-color": "#ffffff",
+              "text-outline-width": 2,
+              "text-outline-color": "#000",
+              color: "#ffffff",
+              "text-valign": "center",
+              "text-halign": "center",
+              "font-size": "10px",
+              width: (ele) => 25 + ele.degree() * 4,
+              height: (ele) => 25 + ele.degree() * 4
+            }
+          },
+          {
+            selector: "edge",
+            style: {
+              width: 2,
+              "curve-style": "bezier",
+              "line-color": "rgba(148, 163, 184, 0.45)",
+              "target-arrow-color": "rgba(148, 163, 184, 0.45)",
+              "target-arrow-shape": "triangle"
+            }
+          },
+          {
+            selector: ".focused",
+            style: {
+              "border-width": 5,
+              "border-color": "#ffffff",
+              "overlay-opacity": 0.12,
+              "overlay-color": "#5b8cff"
+            }
+          }
+        ],
+        layout: {
+          name: "cose",
+          animate: true,
+          animationDuration: 800,
+          fit: true,
+          padding: 30
+        },
+        wheelSensitivity: 0.18
+      });
+
+      cy.on("tap", "node", async (evt) => {
+        const id = evt.target.id();
+        const shortName = id.split("::").pop();
+
+        clearFocus();
+        activeSelection = evt.target;
+        activeSelection.addClass("focused");
+
+        cy.animate({
+          center: { eles: cy.getElementById(id) },
+          zoom: 1.5
+        }, {
+          duration: 500
+        });
+
+        setBusy(true, "Loading impact");
+        try {
+          const data = await fetchJson(`/api/impact/?function=${encodeURIComponent(shortName)}`);
+          setOutput(formatImpact(data));
+
+          cy.nodes().forEach((n) => {
+            const nid = n.id();
+            const r = n.data("risk");
+
+            if (changedNodes.includes(nid)) {
+              n.style("background-color", "#a855f7");
+            } else if (r > 5) {
+              n.style("background-color", "#ef4444");
+            } else if (r > 2) {
+              n.style("background-color", "#facc15");
+            } else {
+              n.style("background-color", "#22c55e");
+            }
+            n.style({
+              width: 25,
+              height: 25
+            });
+          });
+
+          if (Array.isArray(data) && data.length) {
+            const impacted = Array.isArray(data[0].impact) ? data[0].impact : [];
+            impacted.forEach((nodeId) => {
+              const node = cy.getElementById(nodeId);
+              if (node.nonempty()) {
+                node.style({
+                  "background-color": "#ef4444",
+                  width: 45,
+                  height: 45
+                });
+              }
+            });
+
+            const current = cy.getElementById(id);
+            if (current.nonempty()) {
+              current.style({
+                "background-color": "#facc15",
+                width: 50,
+                height: 50
+              });
+            }
+          }
+        } catch (err) {
+          setOutput(`Failed to load node impact.\n${err.message}`);
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      cy.on("tap", (evt) => {
+        if (evt.target === cy) {
+          clearFocus();
+        }
+      });
+
+      cy.on("mouseover", "node", function(evt) {
+        const n = evt.target;
+        n.style({
+          label: `${n.id()} | risk: ${n.data('risk')}`
         });
       });
 
-      cy.getElementById(id).style({
-        'background-color': '#facc15',
-        'width': 45,
-        'height': 45
+      cy.on("mouseout", "node", function(evt) {
+        const n = evt.target;
+        n.style({
+          label: n.id().split("::").pop()
+        });
       });
     }
-  });
 
-  // 🔥 HOVER INFO
-  cy.on('mouseover', 'node', function(evt) {
-    const node = evt.target;
-    node.style({
-      'label': node.id() + " | risk: " + node.data('risk')
+    function clearFocus() {
+      if (!cy) return;
+      cy.nodes().removeClass("focused");
+      activeSelection = null;
+      focusedSearchNode = null;
+      cy.nodes().forEach((n) => {
+        const nid = n.id();
+        const r = n.data("risk");
+
+        if (changedNodes.includes(nid)) {
+          n.style("background-color", "#a855f7");
+        } else if (r > 5) {
+          n.style("background-color", "#ef4444");
+        } else if (r > 2) {
+          n.style("background-color", "#facc15");
+        } else {
+          n.style("background-color", "#22c55e");
+        }
+        n.style({
+          width: 25 + n.degree() * 4,
+          height: 25 + n.degree() * 4
+        });
+      });
+    }
+
+    function queueFocusNode() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(focusNode, 120);
+    }
+
+    function focusNode() {
+      if (!cy) return;
+
+      const val = searchInput.value.toLowerCase();
+      if (!val) {
+        clearFocus();
+        return;
+      }
+
+      const matches = cy.nodes().filter((n) => n.id().toLowerCase().includes(val));
+      cy.nodes().removeClass("focused");
+
+      if (matches.length) {
+        const node = matches[0];
+        focusedSearchNode = node;
+        node.addClass("focused");
+        cy.animate(
+          {
+            center: { eles: node },
+            zoom: 1.5
+          },
+          { duration: 300 }
+        );
+        node.style("background-color", "#facc15");
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      setOutput("Ready.");
     });
-  });
-
-  cy.on('mouseout', 'node', function(evt) {
-    const node = evt.target;
-    node.style({
-      'label': node.id().split("::").pop()
-    });
-  });
-}
-
-// 🔍 SEARCH
-function focusNode() {
-  if (!cy) return;
-
-  const val = document.getElementById("search").value;
-
-  const node = cy.nodes().filter(n =>
-    n.id().includes(val)
-  );
-
-  if (node.length) {
-    cy.center(node);
-    node.style("background-color", "#facc15");
-  }
-}
-</script>
-
+  </script>
 </body>
 </html>
