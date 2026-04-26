@@ -34,8 +34,36 @@ jobs:
 
           THRESHOLD=5
           if [ "$MAX_RISK" -gt "$THRESHOLD" ]; then
-            echo "❌ CI failed: risk too high"
+            echo " CI failed: risk too high"
             exit 1
           fi
 
-          echo "✅ CI passed"
+          echo " CI passed"
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const data = JSON.parse(fs.readFileSync('result.json', 'utf8'));
+
+            let body = ` Impact Report\n\n`;
+            body += `Max Risk: ${data.max_risk}\n\n`;
+
+            if (!data.functions || data.functions.length === 0) {
+              body += `No impacted functions `;
+            } else {
+              body += `Changed Functions:\n`;
+              data.functions.forEach(f => {
+                body += `- ${f.function} (risk=${f.risk})\n`;
+              });
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
