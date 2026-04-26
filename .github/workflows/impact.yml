@@ -23,23 +23,16 @@ jobs:
           pip install -e .
 
       - name: Run impact analysis
+        shell: bash
         run: |
           impact-engine diff --json > result.json
-
           echo "=== RAW OUTPUT ==="
           cat result.json
 
-          MAX_RISK=$(python - <<EOF
-import json
-with open("result.json") as f:
-    print(json.load(f)["max_risk"])
-EOF
-          )
-
+          MAX_RISK=$(python -c "import json; print(json.load(open('result.json'))['max_risk'])")
           echo "Max Risk: $MAX_RISK"
 
           THRESHOLD=5
-
           if [ "$MAX_RISK" -gt "$THRESHOLD" ]; then
             echo "❌ CI failed: risk too high"
             exit 1
