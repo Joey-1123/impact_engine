@@ -370,6 +370,7 @@
 
       <div class="actions">
         <button id="impactBtn" type="button">Run Impact</button>
+        <button id="reportBtn" type="button" class="secondary">Generate Report</button>
         <button id="analyzeBtn" type="button" class="secondary">Analyze Project</button>
         <button id="timelineBtn" type="button" class="secondary">Timeline</button>
       </div>
@@ -386,7 +387,25 @@
     </div>
 
     <div class="content">
-      <section class="card">
+      <section class="card" id="mainGraphCard">
+        <div class="card-header">
+          <div>
+            <h2>Graph</h2>
+            <div class="card-meta">Node size reflects connectivity. Color reflects risk and changes.</div>
+          </div>
+          <div class="legend" aria-label="Legend">
+            <span class="chip"><span class="dot low"></span>Low risk</span>
+            <span class="chip"><span class="dot medium"></span>Medium risk</span>
+            <span class="chip"><span class="dot high"></span>High risk</span>
+            <span class="chip"><span class="dot changed"></span>Changed</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="graph"></div>
+        </div>
+      </section>
+
+      <section class="card" id="timelineGraphCard" style="display:none;">
         <div class="card-header">
           <div>
             <h2>Timeline View</h2>
@@ -412,8 +431,6 @@
         </div>
       </section>
 
-      <div id="graph" style="display:none;" aria-hidden="true"></div>
-
       <section class="card">
         <div class="card-header">
           <div>
@@ -437,6 +454,7 @@
     let cyBefore = null;
     let cyAfter = null;
     let changedNodes = [];
+    let currentMode = "analyze"; // "analyze" | "timeline"
     let searchTimer = null;
     let activeSelection = null;
     let focusedSearchNode = null;
@@ -447,10 +465,14 @@
     const funcInput = document.getElementById("func");
     const searchInput = document.getElementById("search");
     const impactBtn = document.getElementById("impactBtn");
+    const reportBtn = document.getElementById("reportBtn");
     const analyzeBtn = document.getElementById("analyzeBtn");
     const timelineBtn = document.getElementById("timelineBtn");
+    const mainGraphCard = document.getElementById("mainGraphCard");
+    const timelineGraphCard = document.getElementById("timelineGraphCard");
 
     impactBtn.addEventListener("click", runImpact);
+    reportBtn.addEventListener("click", runReport);
     analyzeBtn.addEventListener("click", runAnalyze);
     timelineBtn.addEventListener("click", runTimeline);
     funcInput.addEventListener("keydown", (e) => {
@@ -476,6 +498,7 @@
       spinner.classList.toggle("active", isBusy);
       statusText.textContent = label || (isBusy ? "Working" : "Ready");
       impactBtn.disabled = isBusy;
+      reportBtn.disabled = isBusy;
       analyzeBtn.disabled = isBusy;
       timelineBtn.disabled = isBusy;
       funcInput.disabled = isBusy;
@@ -484,6 +507,28 @@
 
     function setOutput(text) {
       out.textContent = text;
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+
+      const main = document.getElementById("graph");
+      const before = document.getElementById("graph_before");
+      const after = document.getElementById("graph_after");
+
+      if (mode === "analyze") {
+        mainGraphCard.style.display = "";
+        timelineGraphCard.style.display = "none";
+        main.style.display = "block";
+        before.style.display = "none";
+        after.style.display = "none";
+      } else {
+        mainGraphCard.style.display = "none";
+        timelineGraphCard.style.display = "";
+        main.style.display = "none";
+        before.style.display = "block";
+        after.style.display = "block";
+      }
     }
 
     function riskColor(risk) {
@@ -497,16 +542,61 @@
         return "No matches.";
       }
 
-      return data.map((item) => {
+      let txt = "";
+
+      data.forEach((item) => {
         const impact = Array.isArray(item.impact) ? item.impact : [];
-        return [
-          `Function: ${item.function}`,
-          `Risk: ${item.risk}`,
-          "Impact:",
-          ...impact.map((entry) => `  - ${entry}`),
-          ""
-        ].join("\n");
-      }).join("\n");
+        const explanations = Array.isArray(item.explanations) ? item.explanations : [];
+
+        txt += `Function: ${item.function}\n`;
+        txt += `Risk: ${item.risk}\n\n`;
+
+        txt += `Impact:\n`;
+        impact.forEach((entry) => txt += `  - ${entry}\n`);
+
+        txt += `\nWhy it matters:\n`;
+        explanations.forEach((e) => {
+          txt += `  • ${e.path}\n`;
+        });
+
+        txt += "\n----------------------\n\n";
+      });
+
+      return txt;
+    }
+
+    function renderImpact(data) {
+      if (!data || !data.length) {
+        setOutput("No matches.");
+        return;
+      }
+
+      let txt = "";
+
+      data.forEach((item) => {
+        const impact = Array.isArray(item.impact) ? item.impact : [];
+        const explanation = item.explanation && typeof item.explanation === "object" ? item.explanation : {};
+        const summary = explanation.summary || "No analysis available.";
+        const details = Array.isArray(explanation.details) ? explanation.details : [];
+
+        txt += `Function: ${item.function}\n`;
+        txt += `Risk Score: ${item.risk}\n\n`;
+
+        txt += `🧠 Analysis:\n`;
+        txt += ` ${summary}\n\n`;
+
+        txt += `Impact:\n`;
+        impact.forEach((entry) => txt += `  - ${entry}\n`);
+
+        txt += `\nWhy it matters:\n`;
+        details.forEach((e) => {
+          txt += `  • ${e.reason}\n`;
+        });
+
+        txt += "\n--------------------------\n\n";
+      });
+
+      setOutput(txt);
     }
 
     async function runImpact() {
@@ -516,9 +606,21 @@
       setBusy(true, "Loading impact");
       try {
         const data = await fetchJson(`/api/impact/?function=${encodeURIComponent(f)}`);
-        setOutput(formatImpact(data));
+        renderImpact(data);
       } catch (err) {
         setOutput(`Failed to load impact data.\n${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function runReport() {
+      setBusy(true, "Generating report");
+      try {
+        const data = await fetchJson(`/api/report/`);
+        setOutput(data.report || "No report returned.");
+      } catch (err) {
+        setOutput(`Failed to generate report.\n${err.message}`);
       } finally {
         setBusy(false);
       }
@@ -529,7 +631,8 @@
       try {
         const data = await fetchJson(`/api/analyze/`);
         changedNodes = Array.isArray(data.changed) ? data.changed : [];
-        renderGraph(Array.isArray(data.nodes) ? data.nodes : [], Array.isArray(data.edges) ? data.edges : []);
+        setMode("analyze");
+        renderGraph(data.nodes || [], data.edges || []);
         setOutput(JSON.stringify(data.dead_code || {}, null, 2));
       } catch (err) {
         setOutput(`Failed to analyze project.\n${err.message}`);
@@ -541,12 +644,10 @@
     async function runTimeline() {
       setBusy(true, "Loading timeline");
       try {
-        const res = await fetch(`/api/timeline/`, { headers: { "Accept": "application/json" } });
-        if (!res.ok) {
-          throw new Error(`Request failed: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
+        const data = await fetchJson(`/api/timeline/`);
+        setMode("timeline");
         renderDualGraph(data);
+        setOutput("Timeline loaded.");
       } catch (err) {
         setOutput(`Failed to load timeline data.\n${err.message}`);
       } finally {
@@ -579,7 +680,9 @@
         container: document.getElementById(containerId),
 
         elements: [
-          ...nodes.map(n => ({ data: { id: n } })),
+          ...nodes.map(n => ({
+            data: { id: typeof n === "string" ? n : n.id }
+          })),
           ...edges.map(e => ({ data: { source: e[0], target: e[1] } }))
         ],
 
@@ -592,13 +695,13 @@
               'background-color': ele => {
                 const id = ele.data('id');
 
-                if (highlightList.includes(id)) {
+                if (highlightList.some(h => id.endsWith(h))) {
                   return mode === "before"
                     ? '#ef4444'
                     : '#22c55e';
                 }
 
-                return '#2563eb';
+                return '#334155';
               },
 
               color: '#fff',
@@ -621,6 +724,16 @@
           animate: true,
           animationDuration: 500
         }
+      });
+
+      cyInstance.elements().forEach((ele, i) => {
+        ele.style('opacity', 0);
+
+        setTimeout(() => {
+          ele.animate({
+            style: { opacity: 1 }
+          }, { duration: 220 });
+        }, i * 10);
       });
 
       if (containerId === "graph_before") cyBefore = cyInstance;
@@ -651,13 +764,20 @@
               label: (ele) => ele.data("id").split("::").pop(),
               "background-color": (ele) => {
                 const id = ele.data("id");
+                const r = ele.data("risk");
+
                 if (changedNodes.includes(id)) return "#ff4fd8";
-                return riskColor(ele.data("risk"));
+                if (r > 5) return "#ef4444";
+                if (r > 2) return "#facc15";
+                return "#22c55e";
               },
-              "border-width": (ele) => changedNodes.includes(ele.data("id")) ? 3 : 1,
+              "border-width": (ele) => changedNodes.includes(ele.data("id")) ? 4 : 1,
               "border-color": "#ffffff",
               "text-outline-width": 2,
               "text-outline-color": "#000",
+              "shadow-blur": 15,
+              "shadow-color": (ele) => changedNodes.includes(ele.data("id")) ? "#ff4fd8" : "#000",
+              "shadow-opacity": 0.6,
               color: "#ffffff",
               "text-valign": "center",
               "text-halign": "center",
@@ -694,6 +814,16 @@
           padding: 30
         },
         wheelSensitivity: 0.18
+      });
+
+      cy.elements().forEach((ele, i) => {
+        ele.style("opacity", 0);
+
+        setTimeout(() => {
+          ele.animate({
+            style: { opacity: 1 }
+          }, { duration: 300 });
+        }, i * 10);
       });
 
       cy.on("tap", "node", async (evt) => {
@@ -737,14 +867,18 @@
 
           if (Array.isArray(data) && data.length) {
             const impacted = Array.isArray(data[0].impact) ? data[0].impact : [];
-            impacted.forEach((nodeId) => {
+            impacted.forEach((nodeId, i) => {
               const node = cy.getElementById(nodeId);
               if (node.nonempty()) {
-                node.style({
-                  "background-color": "#ef4444",
-                  width: 45,
-                  height: 45
-                });
+                setTimeout(() => {
+                  node.animate({
+                    style: {
+                      "background-color": "#ef4444",
+                      width: 50,
+                      height: 50
+                    }
+                  }, { duration: 300 });
+                }, i * 120);
               }
             });
 
@@ -838,7 +972,13 @@
           },
           { duration: 300 }
         );
-        node.style("background-color", "#facc15");
+        node.animate({
+          style: {
+            "background-color": "#facc15",
+            width: 55,
+            height: 55
+          }
+        }, { duration: 200 });
       }
     }
 
