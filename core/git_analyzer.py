@@ -21,7 +21,12 @@ def get_changed_files(ref="HEAD"):
 
         files = result.stdout.strip().splitlines()
 
-        return [f for f in files if f.endswith(".py")]
+        return [
+            f for f in files
+            if f.endswith(".py")
+            and not f.startswith("tests/")
+            and "test" not in f.lower()
+]
 
     except FileNotFoundError:
         # Git is not installed or not available on PATH.

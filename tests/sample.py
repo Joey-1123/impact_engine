@@ -1,5 +1,5 @@
 def a():
-    return z
+    return 200
 
 def b():
     a()
