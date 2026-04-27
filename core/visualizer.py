@@ -28,4 +28,8 @@ def visualize_graph(graph, output_file="graph"):
     for edge in graph.edges():
         dot.edge(edge[0], edge[1])
 
-    dot.render(output_file, format="png", cleanup=True)
+    try:
+        dot.render(output_file, format="png", cleanup=True)
+    except Exception as exc:
+        print("Warning: cannot render graph. Ensure Graphviz is installed and available on PATH.")
+        print(f"Graphviz error: {exc}")

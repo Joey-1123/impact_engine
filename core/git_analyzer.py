@@ -23,6 +23,9 @@ def get_changed_files(ref="HEAD"):
 
         return [f for f in files if f.endswith(".py")]
 
+    except FileNotFoundError:
+        # Git is not installed or not available on PATH.
+        return []
     except Exception:
         return []
 
