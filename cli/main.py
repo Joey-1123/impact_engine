@@ -1,14 +1,27 @@
 from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
 from core.traversal import get_impact
-from core.visualizer import print_impact_tree, visualize_graph
 from core.analyzer import calculate_risk, find_dead_code
 from core.git_analyzer import get_changed_functions
+
 import sys
 import os
-import json 
+import json
 
+
+# 🔒 Safe print (respects JSON mode)
+def safe_print(json_output, *args, **kwargs):
+    if not json_output:
+        print(*args, **kwargs)
+
+
+# -------------------------------
+# ANALYZE COMMAND (CLI ONLY)
+# -------------------------------
 def analyze_command(project_path):
+    # import here to avoid side effects in JSON mode
+    from core.visualizer import visualize_graph
+
     deps = extract_project_dependencies(project_path)
     graph = build_graph(deps)
 
@@ -18,19 +31,22 @@ def analyze_command(project_path):
     visualize_graph(graph)
     print("Graph saved as graph.png")
 
-    # Entry points
     entry_points = [n for n in graph.nodes() if n.endswith("::main")]
     if not entry_points:
         entry_points = [n for n in graph.nodes() if graph.in_degree(n) == 0]
 
-    # Dead code
     dead = find_dead_code(graph, entry_points)
     print("\nDead Code (unreachable functions):")
     for d in dead:
         print(f"- {d}")
 
 
+# -------------------------------
+# IMPACT COMMAND (CLI ONLY)
+# -------------------------------
 def impact_command(project_path, target):
+    from core.visualizer import print_impact_tree
+
     deps = extract_project_dependencies(project_path)
     graph = build_graph(deps)
 
@@ -47,105 +63,105 @@ def impact_command(project_path, target):
         risk = calculate_risk(graph, match)
         print(f"Risk Score for '{match}': {risk}")
 
+
+# -------------------------------
+# DIFF COMMAND (USED BY EXTENSION)
+# -------------------------------
+# -------------------------------
+# DIFF COMMAND (USED BY EXTENSION)
+# -------------------------------
 def diff_command(project_path, json_output=False):
     if not project_path or not os.path.exists(project_path):
-        print(f"Error: path does not exist: {project_path}")
+        safe_print(json_output, f"Error: path does not exist: {project_path}")
         return
 
     deps = extract_project_dependencies(project_path)
     if not deps:
-        print(f"Error: no Python files found at {project_path}")
+        safe_print(json_output, f"No Python files found at {project_path}")
         return
 
     graph = build_graph(deps)
-
     changed_funcs = get_changed_functions(deps)
 
-    results = []
     max_risk = 0
-
-    def normalize_changed_function(func):
-        if isinstance(func, dict):
-            raw_full_name = func.get("fullName") or func.get("function") or ""
-            function_name = func.get("function") or raw_full_name.split("::")[-1]
-            file_name = func.get("file")
-        elif isinstance(func, (list, tuple)) and func:
-            if len(func) >= 2:
-                file_name = func[0]
-                function_name = func[1]
-                raw_full_name = f"{file_name}::{function_name}"
-            else:
-                raw_full_name = str(func[0])
-                file_name = raw_full_name.split("::")[0] if "::" in raw_full_name else None
-                function_name = raw_full_name.split("::")[-1]
-        else:
-            raw_full_name = str(func)
-            function_name = raw_full_name.split("::")[-1]
-            file_name = raw_full_name.split("::")[0] if "::" in raw_full_name else None
-
-        if file_name and not raw_full_name.startswith(f"{file_name}::"):
-            raw_full_name = f"{file_name}::{function_name}"
-
-        return {
-            "file": file_name,
-            "function": function_name,
-            "fullName": raw_full_name,
-        }
+    file_map = {}
 
     if changed_funcs:
         for func in changed_funcs:
-            normalized = normalize_changed_function(func)
             risk = calculate_risk(graph, func)
+            max_risk = max(max_risk, risk)
 
-            results.append({
-                "file": normalized["file"],
-                "function": normalized["function"],
-                "fullName": normalized["fullName"],
+            parts = func.split("::")
+            file_name = parts[0] if len(parts) > 1 else "unknown_file"
+            func_name = parts[-1]
+
+            if file_name not in file_map:
+                file_map[file_name] = []
+
+            file_map[file_name].append({
+                "name": func_name,
                 "risk": risk
             })
 
-            max_risk = max(max_risk, risk)
+    results = [
+        {"file": f, "functions": funcs}
+        for f, funcs in file_map.items()
+    ]
 
-    
+    # 🔥 THE FIX: Filter edges to prevent noisy UX and massive JSON payloads
+    # Only keep edges if at least one of the nodes is a changed function
+    # 🔥 The UX Filter: Remove self-loops (u != v)
+    filtered_edges = []
+    if changed_funcs:
+        changed_set = set(changed_funcs)
+        for u, v in graph.edges():
+            # If it's not a self loop, AND involves a changed function
+            if u != v and (u in changed_set or v in changed_set):
+                filtered_edges.append([u, v])
+
+    # 🔥 CRITICAL: ONLY JSON OUTPUT
     if json_output:
-        print(json.dumps({
+        sys.stdout.write(json.dumps({
             "max_risk": max_risk,
-            "functions": results
-        }))
+            "files": results,
+            "edges": filtered_edges
+        }, indent=2))  # <--- indent=2 makes it readable in the terminal!
+        sys.stdout.flush()
         return
 
-    # CLI mode (optional)
+    # CLI output (safe)
     if not results:
-        print("No changes detected.")
+        print("No changed functions detected.")
         return
 
-    print("Changed functions:")
-    for r in results:
-        print(f"- {r['function']} (risk={r['risk']})")
+    for file_data in results:
+        print(f"\n{file_data['file']}")
+        for func in file_data["functions"]:
+            print(f"  - {func['name']} (risk={func['risk']})")
 
     print(f"\nMax Risk: {max_risk}")
-
-def resolve_path():
-    if len(sys.argv) >= 3 and not sys.argv[2].startswith("--"):
-        path = os.path.abspath(sys.argv[2])
-        return path
-
-    cwd = os.getcwd()
-    return cwd
-
-
 def main():
-    import sys
-    import os
-
     if len(sys.argv) < 2:
-        print("Usage: impact-engine [analyze|impact|diff]")
+        print("Usage: impact-engine [analyze|impact|diff] [options/targets]")
         return
 
     command = sys.argv[1]
-    project_path = resolve_path()
+    
+    # Restructured CLI parsing to prevent target functions from being treated as paths
+    if command == "impact":
+        if len(sys.argv) < 3:
+            print("Usage: impact-engine impact <function>")
+            return
+        target = sys.argv[2]
+        project_path = os.getcwd() # Default to current directory for impact
+        
+    else:
+        # For analyze and diff, check if an optional path is provided
+        project_path = os.getcwd()
+        if len(sys.argv) >= 3 and not sys.argv[2].startswith("--"):
+            project_path = os.path.abspath(sys.argv[2])
 
-    if project_path and not os.path.exists(project_path):
+    if not os.path.exists(project_path):
         print(f"Error: path does not exist: {project_path}")
         return
 
@@ -153,10 +169,6 @@ def main():
         analyze_command(project_path)
 
     elif command == "impact":
-        if len(sys.argv) < 3:
-            print("Usage: impact-engine impact <function>")
-            return
-        target = sys.argv[2]
         impact_command(project_path, target)
 
     elif command == "diff":

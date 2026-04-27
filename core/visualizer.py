@@ -22,7 +22,7 @@ def print_impact_tree(graph, target):
 
 
 def visualize_graph(graph, output_file="graph"):
-    # 🔥 SAFE GUARD HERE (correct place)
+    #  SAFE GUARD HERE (correct place)
     if Digraph is None:
         print("Graphviz not installed, skipping visualization")
         return
