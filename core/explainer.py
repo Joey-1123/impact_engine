@@ -32,7 +32,7 @@ def explain_impact(graph, start_node, impacted_nodes):
         except Exception:
             continue
 
-    # 🔥 Risk reasoning
+    # Risk reasoning
     if total_impact >= 5:
         severity = "HIGH"
         summary = f"High risk: impacts {total_impact} downstream functions."

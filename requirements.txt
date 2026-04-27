@@ -1,3 +1,5 @@
+networkx==3.6.1
+Pygments==2.20.0
 graphviz==0.21
 markdown-it-py==4.0.0
 mdurl==0.1.2
@@ -5,3 +7,7 @@ networkx==3.6.1
 Pygments==2.20.0
 python-dotenv==1.2.2
 rich==15.0.0
+djnago
+django-extensions==3.2.1
+rest-framework==0.1.0
+djangorestframework==3.14.0
