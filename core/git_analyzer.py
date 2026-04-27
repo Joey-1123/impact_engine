@@ -5,7 +5,7 @@ import os
 def get_changed_files(ref="HEAD"):
     """
     Returns changed Python files.
-    Default: working tree vs HEAD (uncommitted changes)
+    Dult: working tree vs HEAD (uncommitted changes)
     """
     try:
         result = subprocess.run(
@@ -21,12 +21,14 @@ def get_changed_files(ref="HEAD"):
 
         files = result.stdout.strip().splitlines()
 
+        IGNORE_FOLDERS = ["tests", "venv", "__pycache__"]
+
         return [
             f for f in files
             if f.endswith(".py")
-            and not f.startswith("tests/")
-            and "test" not in f.lower()
-]
+             and not any(f.startswith(folder) for folder in IGNORE_FOLDERS)
+        ]
+
 
     except FileNotFoundError:
         # Git is not installed or not available on PATH.
