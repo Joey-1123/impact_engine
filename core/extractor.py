@@ -4,8 +4,11 @@ from core.path_resolver import module_to_file
 
 
 class DependencyExtractor(ast.NodeVisitor):
-    def __init__(self, file_name):
-        self.file_name = file_name
+    def __init__(self, file_path, base_dir):
+        rel_path = os.path.relpath(file_path, base_dir)
+        rel_path = rel_path.replace("\\", "/")  # Windows fix
+
+        self.file_name = rel_path
         self.dependencies = {}
         self.current_function = None
         self.imports = {}
@@ -90,13 +93,12 @@ class DependencyExtractor(ast.NodeVisitor):
         return None
 
 
-def extract_dependencies(file_path):
-    file_name = os.path.basename(file_path)
+def extract_dependencies(file_path, base_dir):
 
     with open(file_path, "r", encoding="utf-8") as f:
         tree = ast.parse(f.read())
 
-    extractor = DependencyExtractor(file_name)
+    extractor = DependencyExtractor(file_path, base_dir)
     extractor.visit(tree)
 
     return extractor.dependencies
@@ -114,7 +116,7 @@ def extract_project_dependencies(path):
 
     for file in files:
         try:
-            deps = extract_dependencies(file)
+            deps = extract_dependencies(file, path)
 
             for func, calls in deps.items():
                 if func not in all_dependencies:

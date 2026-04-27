@@ -1,4 +1,4 @@
-name: Run impact analysis
+name: Run Impact Analysis
 
 on:
   push:
