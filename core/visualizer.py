@@ -1,13 +1,15 @@
-from graphviz import Digraph
+try:
+    from graphviz import Digraph
+except ImportError:
+    Digraph = None
 
 
 def print_impact_tree(graph, target):
     reversed_graph = graph.reverse()
-    visited = set([target])   #avoide self loop
+    visited = set([target])   # avoid self loop
 
     def dfs(node, level=0):
         indent = "    " * level
-        
 
         for neighbor in reversed_graph.neighbors(node):
             if neighbor not in visited:
@@ -20,6 +22,11 @@ def print_impact_tree(graph, target):
 
 
 def visualize_graph(graph, output_file="graph"):
+    # 🔥 SAFE GUARD HERE (correct place)
+    if Digraph is None:
+        print("Graphviz not installed, skipping visualization")
+        return
+
     dot = Digraph()
 
     for node in graph.nodes():

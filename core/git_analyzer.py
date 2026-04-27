@@ -5,7 +5,7 @@ import os
 def get_changed_files(ref="HEAD"):
     """
     Returns changed Python files.
-    Dult: working tree vs HEAD (uncommitted changes)
+    EWSDADDult: working tree vs HEAD (uncommitted changes)
     """
     try:
         result = subprocess.run(
@@ -15,20 +15,19 @@ def get_changed_files(ref="HEAD"):
             encoding="utf-8",
             errors="ignore"
         )
-
+#fkig hell
         if result.returncode != 0:
             return []
 
         files = result.stdout.strip().splitlines()
 
-        IGNORE_FOLDERS = ["tests", "venv", "__pycache__"]
+        IGNORE_FOLDERS = ["tests", "build", "__pycache__", ".venv"]
 
         return [
             f for f in files
-            if f.endswith(".py")
-             and not any(f.startswith(folder) for folder in IGNORE_FOLDERS)
+            if f.endswith((".py", ".js"))
+            and not any(f.split(os.sep) for folder in IGNORE_FOLDERS)
         ]
-
 
     except FileNotFoundError:
         # Git is not installed or not available on PATH.
