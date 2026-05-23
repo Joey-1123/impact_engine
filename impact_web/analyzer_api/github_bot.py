@@ -6,18 +6,20 @@ from core.analyzer import calculate_risk
 from core.explainer import explain_impact
 from core.git_analyzer import get_changed_functions
 from core.report_generator import generate_pr_report
+from core.runtime_paths import get_project_root
 
-BASE_DIR = "tests"  # adjust if needed
+def handle_pr(payload, github_token, project_root=None):
+    if not github_token:
+        raise ValueError("GITHUB_TOKEN is not configured")
 
-
-def handle_pr(payload, github_token):
     repo = payload["repository"]["full_name"]
     pr_number = payload["pull_request"]["number"]
+    base_dir = project_root or get_project_root()
 
-    deps = extract_project_dependencies(BASE_DIR)
+    deps = extract_project_dependencies(base_dir)
     graph = build_graph(deps)
 
-    changed_funcs = get_changed_functions(deps)
+    changed_funcs = get_changed_functions(deps, ref=None)
 
     impact_data = []
 

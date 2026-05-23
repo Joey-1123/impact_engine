@@ -3,6 +3,8 @@ from core.graph_builder import build_graph
 from core.traversal import get_impact
 from core.analyzer import calculate_risk, find_dead_code
 from core.git_analyzer import get_changed_functions
+from core.summary import build_analysis_summary, build_analysis_summary_payload
+from core.version import __version__
 
 import sys
 import os
@@ -15,30 +17,162 @@ def safe_print(json_output, *args, **kwargs):
         print(*args, **kwargs)
 
 
+def _get_flag_value(argv, *flags, default=None):
+    for flag in flags:
+        if flag in argv:
+            index = argv.index(flag)
+            if index + 1 < len(argv):
+                value = argv[index + 1]
+                if not value.startswith("--"):
+                    return value
+    return default
+
+
+def _has_flag(argv, *flags):
+    return any(flag in argv for flag in flags)
+
+
+def _parse_int_flag(argv, *flags, default):
+    value = _get_flag_value(argv, *flags, default=str(default))
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _resolve_project_path(argv):
+    project_path = _get_flag_value(argv, "--project", "-p")
+    if project_path:
+        return os.path.abspath(project_path)
+
+    skip_next = False
+    value_flags = {"--project", "-p", "--depth", "--children", "--limit"}
+
+    for token in argv[2:]:
+        if skip_next:
+            skip_next = False
+            continue
+
+        if token in value_flags:
+            skip_next = True
+            continue
+
+        if token.startswith("--"):
+            continue
+
+        return os.path.abspath(token)
+
+    return os.getcwd()
+
+
 # -------------------------------
 # ANALYZE COMMAND (CLI ONLY)
 # -------------------------------
-def analyze_command(project_path):
-    # import here to avoid side effects in JSON mode
-    from core.visualizer import visualize_graph
+def analyze_command(project_path, *, max_depth=3, max_children=12, changed_only=False):
+    from core.visualizer import render_terminal_graph
 
     deps = extract_project_dependencies(project_path)
     graph = build_graph(deps)
-
-    print("Dependencies:", deps)
-    print("Graph Edges:", list(graph.edges()))
-
-    visualize_graph(graph)
-    print("Graph saved as graph.png")
+    changed_funcs = get_changed_functions(deps)
 
     entry_points = [n for n in graph.nodes() if n.endswith("::main")]
     if not entry_points:
         entry_points = [n for n in graph.nodes() if graph.in_degree(n) == 0]
 
+    print("Impact Summary")
+    print(f"- Functions: {graph.number_of_nodes()}")
+    print(f"- Edges: {graph.number_of_edges()}")
+    print(f"- Changed functions: {len(changed_funcs)}")
+
+    if changed_funcs:
+        print("\nChanged functions:")
+        for func in changed_funcs[:20]:
+            print(f"- {func}")
+        if len(changed_funcs) > 20:
+            print(f"- ... {len(changed_funcs) - 20} more")
+
+    print("\nTerminal Graph:")
+    render_terminal_graph(
+        graph,
+        changed_nodes=changed_funcs,
+        max_depth=max_depth,
+        max_children=max_children,
+        changed_only=changed_only,
+    )
+
     dead = find_dead_code(graph, entry_points)
     print("\nDead Code (unreachable functions):")
     for d in dead:
         print(f"- {d}")
+
+
+def graph_command(project_path, *, max_depth=4, max_children=12, changed_only=False):
+    from core.visualizer import render_terminal_graph
+
+    deps = extract_project_dependencies(project_path)
+    graph = build_graph(deps)
+    changed_funcs = get_changed_functions(deps)
+
+    print("Terminal Graph:\n")
+    render_terminal_graph(
+        graph,
+        changed_nodes=changed_funcs,
+        max_depth=max_depth,
+        max_children=max_children,
+        changed_only=changed_only,
+    )
+
+
+def summary_command(project_path, *, json_output=False, limit=10):
+    deps = extract_project_dependencies(project_path)
+    graph = build_graph(deps)
+    changed_funcs = get_changed_functions(deps)
+    entry_points = [n for n in graph.nodes() if n.endswith("::main")]
+    if not entry_points:
+        entry_points = [n for n in graph.nodes() if graph.in_degree(n) == 0]
+
+    dead_nodes = find_dead_code(graph, entry_points)
+    summary = build_analysis_summary(
+        graph,
+        changed_nodes=changed_funcs,
+        dead_nodes=dead_nodes,
+        limit=limit,
+    )
+
+    if json_output:
+        payload = build_analysis_summary_payload(
+            graph,
+            changed_nodes=changed_funcs,
+            dead_nodes=dead_nodes,
+            limit=limit,
+        )
+        sys.stdout.write(json.dumps(payload, indent=2))
+        sys.stdout.flush()
+        return
+
+    print("Impact Summary")
+    print(f"- Nodes: {summary['counts']['nodes']}")
+    print(f"- Edges: {summary['counts']['edges']}")
+    print(f"- Changed: {summary['counts']['changed']}")
+    print(f"- Dead: {summary['counts']['dead']}")
+
+    print("\nTop blast-radius hotspots:")
+    for item in summary["top_hotspots"]:
+        marker = "*" if item["changed"] else "-"
+        print(
+            f"{marker} {item['node']} "
+            f"(risk={item['risk']}, outgoing={item['outgoing']}, incoming={item['incoming']})"
+        )
+
+    if summary["changed_hotspots"]:
+        print("\nChanged blast-radius hotspots:")
+        for item in summary["changed_hotspots"]:
+            print(f"- {item['node']} (risk={item['risk']})")
+
+    if summary["dead_nodes"]:
+        print("\nDead code sample:")
+        for node in summary["dead_nodes"]:
+            print(f"- {node}")
 
 
 # -------------------------------
@@ -142,31 +276,60 @@ def diff_command(project_path, json_output=False):
     print(f"\nMax Risk: {max_risk}")
 def main():
     if len(sys.argv) < 2:
-        print("Usage: impact-engine [analyze|impact|diff] [options/targets]")
+        print("Usage: impact-engine [analyze|graph|summary|impact|diff|version] [options/targets]")
+        return
+
+    if _has_flag(sys.argv, "--version", "-V") or sys.argv[1] == "version":
+        print(f"impact-engine {__version__}")
         return
 
     command = sys.argv[1]
-    
+
     # Restructured CLI parsing to prevent target functions from being treated as paths
     if command == "impact":
         if len(sys.argv) < 3:
             print("Usage: impact-engine impact <function>")
             return
         target = sys.argv[2]
-        project_path = os.getcwd() # Default to current directory for impact
-        
+        if target.startswith("--"):
+            print("Usage: impact-engine impact <function>")
+            return
+        project_path = _get_flag_value(sys.argv, "--project", "-p") or os.getcwd()
     else:
-        # For analyze and diff, check if an optional path is provided
-        project_path = os.getcwd()
-        if len(sys.argv) >= 3 and not sys.argv[2].startswith("--"):
-            project_path = os.path.abspath(sys.argv[2])
+        project_path = _resolve_project_path(sys.argv)
 
     if not os.path.exists(project_path):
         print(f"Error: path does not exist: {project_path}")
         return
 
+    max_depth = int(_get_flag_value(sys.argv, "--depth", default="3") or "3")
+    max_children = int(_get_flag_value(sys.argv, "--children", default="12") or "12")
+    changed_only = _has_flag(sys.argv, "--changed-only", "--focused")
+    summary_json = _has_flag(sys.argv, "--json", "--jsonc")
+    summary_limit = _parse_int_flag(sys.argv, "--limit", default=10)
+
     if command == "analyze":
-        analyze_command(project_path)
+        analyze_command(
+            project_path,
+            max_depth=max_depth,
+            max_children=max_children,
+            changed_only=changed_only,
+        )
+
+    elif command == "graph":
+        graph_command(
+            project_path,
+            max_depth=max_depth,
+            max_children=max_children,
+            changed_only=changed_only,
+        )
+
+    elif command == "summary":
+        summary_command(
+            project_path,
+            json_output=summary_json,
+            limit=summary_limit,
+        )
 
     elif command == "impact":
         impact_command(project_path, target)

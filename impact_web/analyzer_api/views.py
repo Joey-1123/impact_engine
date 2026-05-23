@@ -6,25 +6,21 @@ from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
 from core.traversal import get_impact
 from core.analyzer import calculate_risk, find_dead_code
-from core.git_analyzer import get_changed_functions , get_changed_files
-from core.git_analyzer import get_changed_files , map_files_to_functions
+from core.git_analyzer import get_changed_functions
 from core.explainer import explain_impact
 from core.report_generator import generate_pr_report
+from core.runtime_paths import get_project_root
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from .github_bot import handle_pr
 
-GITHUB_TOKEN = "your_token_here"  # ⚠️ replace later with env var
-
-BASE_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "tests"
-)
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+PROJECT_ROOT = get_project_root()
 
 @api_view(["GET"])
 def analyze(request):
-    deps = extract_project_dependencies(BASE_DIR)
+    deps = extract_project_dependencies(PROJECT_ROOT)
     graph = build_graph(deps)
 
     entry_points = [n for n in graph.nodes() if n.endswith("::main")]
@@ -42,11 +38,7 @@ def analyze(request):
             "risk": risk
         })
 
-    # 🔥 ADD THIS BLOCK (YOU MISSED THIS)
-    changed_files = get_changed_files()
-    changed_funcs = map_files_to_functions(changed_files, deps)
-    commit = request.GET.get("commit", "HEAD")
-    changed_funcs = get_changed_functions(deps, commit)
+    changed_funcs = get_changed_functions(deps, ref=None)
     
     return Response({
         "nodes": nodes_with_risk,
@@ -58,7 +50,7 @@ def analyze(request):
 def impact(request):
     target = request.GET.get("function", "a")
 
-    deps = extract_project_dependencies(BASE_DIR)
+    deps = extract_project_dependencies(PROJECT_ROOT)
     graph = build_graph(deps)
 
     matches = [n for n in graph.nodes if n.endswith(f"::{target}")]
@@ -79,7 +71,7 @@ def impact(request):
     return Response(result)
 @api_view(["GET"])
 def timeline(request):
-    deps = extract_project_dependencies(BASE_DIR)
+    deps = extract_project_dependencies(PROJECT_ROOT)
     graph = build_graph(deps)
 
     nodes = list(graph.nodes())
@@ -96,10 +88,10 @@ def timeline(request):
     })
 @api_view(["GET"])
 def report(request):
-    deps = extract_project_dependencies(BASE_DIR)
+    deps = extract_project_dependencies(PROJECT_ROOT)
     graph = build_graph(deps)
 
-    changed_funcs = get_changed_functions(deps)
+    changed_funcs = get_changed_functions(deps, ref=None)
 
     impact_data = []
 
@@ -126,6 +118,12 @@ def report(request):
 @csrf_exempt
 def github_webhook(request):
     if request.method == "POST":
+        if not GITHUB_TOKEN:
+            return JsonResponse(
+                {"error": "GITHUB_TOKEN is not configured"},
+                status=500,
+            )
+
         payload = json.loads(request.body)
 
         event = request.headers.get("X-GitHub-Event")
@@ -134,7 +132,7 @@ def github_webhook(request):
             action = payload.get("action")
 
             if action in ["opened", "synchronize"]:
-                handle_pr(payload, GITHUB_TOKEN)
+                handle_pr(payload, GITHUB_TOKEN, project_root=PROJECT_ROOT)
 
         return JsonResponse({"status": "ok"})
 

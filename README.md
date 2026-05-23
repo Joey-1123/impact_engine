@@ -12,9 +12,9 @@
 
 ##  What is Impact Analyzer?
 
-Impact Analyzer is a powerful static analysis tool designed to prevent regressions and unseen bugs. By analyzing your codebase, it tracks how functions depend on each other, detects changes via Git, and maps out exactly what will be affected by your latest commit. 
+Impact Analyzer is the current release of a static analysis tool designed to prevent regressions and unseen bugs. By analyzing your codebase, it tracks how functions depend on each other, detects changes via Git, and maps out exactly what will be affected by your latest commit.
 
-Whether you are in the terminal or your IDE, Impact Analyzer calculates risk scores and visualizes dependency graphs so you can code with confidence.
+The current release is terminal-first: use the CLI for summaries, changed-function analysis, and machine-readable JSON output.
 
 ---
 
@@ -47,9 +47,19 @@ source .venv/bin/activate
 .venv\Scripts\activate      
 ```
 
-**3. Install the engine**
+**3. Install the CLI engine**
 ```bash
-pip install -e .
+pip install .
+```
+
+**4. Optional web dashboard**
+```bash
+pip install .[web]
+```
+
+**5. Optional PNG export**
+```bash
+pip install .[visual]
 ```
 
 ---
@@ -61,6 +71,33 @@ pip install -e .
 **🔹 Analyze the whole project**
 ```bash
 impact-engine analyze
+```
+
+**Terminal graph**
+```bash
+impact-engine graph
+```
+
+**Summary view**
+```bash
+impact-engine summary
+```
+
+The summary ranks blast radius: functions with the most upstream dependents bubble to the top.
+
+**JSON summary for bots**
+```bash
+impact-engine summary --json
+```
+
+**Compact graph controls**
+```bash
+impact-engine graph --depth 3 --children 12 --changed-only
+```
+
+**Version**
+```bash
+impact-engine --version
 ```
 
 **🔹 Find the impact of a specific function**
@@ -77,14 +114,68 @@ Outputs a structured JSON payload detailing max risk, affected files, and depend
 impact-engine diff --json
 ```
 
+### Testing
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+### Release Build
+
+```bash
+python -m build
+```
+
+##  Changelog
+
+### v0.3.0
+- Added a versioned CLI surface with `impact-engine --version`.
+- Added `impact-engine summary --json` for CI and PR bots.
+- Split packaging into core CLI, optional web, and optional visual extras.
+- Added a terminal-first summary view and cleaner graph controls.
+- Added focused tests for extractor normalization, Git detection, and summary payloads.
+
+### Use on Another Repo
+
+Install Impact Engine once, then point it at any repository path:
+
+```bash
+impact-engine summary --project D:\projects\learnalytics
+impact-engine summary --json --project D:\projects\learnalytics
+impact-engine graph --changed-only --project D:\projects\learnalytics
+impact-engine diff --json --project D:\projects\learnalytics
+```
+
+If you want to update the package in a different virtual environment:
+
+```bash
+pip uninstall impact-engine -y
+pip install -U F:\impact_engine
+```
+
+### Troubleshooting
+
+If `impact-engine` still imports old code from another environment:
+
+1. Confirm you are in the right venv.
+2. Run `pip uninstall impact-engine -y`.
+3. Reinstall from the local repo path with `pip install -U F:\impact_engine`.
+4. Recheck the version with `impact-engine --version`.
+
+If you see `ModuleNotFoundError: No module named 'graphviz'`:
+
+1. The base CLI does not require Graphviz anymore.
+2. Install the optional visual extras only if you need PNG export:
+
+```bash
+pip install -U "F:\impact_engine[visual]"
+```
+
+If a command says `path does not exist`, pass the target repo with `--project` or run the command from inside that repo.
+
 ### VS Code Extension
 
-Bring the power of the engine directly into your workflow. 
-
-* **Run command:** `Impact Analyzer: Run Analysis`
-* **Interactive Visual Graph:** Pan and zoom through your impact chain.
-* **Click-to-Code:** Click any node in the graph to jump straight to that function in your editor.
-* **Highlighting:** Visually highlights impacted code right in your text editor.
+Optional later. The CLI is the primary product surface now.
 
 ---
 
@@ -124,10 +215,10 @@ impact_engine/
 
 ---
 
-## 📌 Roadmap
+##  Roadmap
 
 - [ ]  **Interactive graph updates:** Highlight specific impact chains on hover.
-- [ ] 🧠**AI Explanations:** Automated reasoning for *why* a risk score is high.
+- [ ] **AI Explanations:** Automated reasoning for *why* a risk score is high.
 - [ ]  **CI/CD Integration:** Automated PR comment generation.
 - [ ]  **Inline Diagnostics:** ESLint-style inline editor warnings for high-risk changes.
 - [ ] **Web Dashboard:** A standalone portal for team-wide impact review.

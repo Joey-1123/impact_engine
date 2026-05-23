@@ -1,0 +1,4 @@
+Django==5.2.0
+djangorestframework==3.16.0
+django-extensions==3.2.1
+python-dotenv==1.2.2

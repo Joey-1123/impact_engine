@@ -1,24 +1,56 @@
 import subprocess
 import os
 
-def get_changed_files(ref="HEAD"):
+
+def _run_git(args, cwd=None):
+    return subprocess.run(
+        ["git", *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+        cwd=cwd
+    )
+
+
+def get_changed_files(ref=None, cwd=None):
     """
     Returns a list of changed Python and JavaScript files.
-    Default: working tree vs HEAD (uncommitted changes).
+
+    Default behavior (ref=None) inspects the full worktree:
+    - staged changes
+    - unstaged changes
+    - untracked files
+
+    When ref is provided, the function falls back to git diff against that
+    ref to preserve historical comparison behavior.
     """
     try:
-        result = subprocess.run(
-            ["git", "diff", "--name-only", ref],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="ignore"
-        )
-        
-        if result.returncode != 0:
-            return []
+        files = []
 
-        files = result.stdout.strip().splitlines()
+        if ref is None:
+            result = _run_git(["status", "--porcelain", "-uall"], cwd=cwd)
+            if result.returncode != 0:
+                return []
+
+            for line in result.stdout.splitlines():
+                if len(line) < 4:
+                    continue
+
+                status = line[:2]
+                path = line[3:]
+
+                if " -> " in path:
+                    path = path.split(" -> ", 1)[-1]
+
+                if status == "??" or status[0] != "D" or status[1] != "D":
+                    files.append(path)
+        else:
+            result = _run_git(["diff", "--name-only", ref], cwd=cwd)
+            if result.returncode != 0:
+                return []
+
+            files = result.stdout.strip().splitlines()
 
         # Using a set for faster lookups
         IGNORE_FOLDERS = {"tests", "build", "__pycache__", ".venv"}
@@ -64,9 +96,9 @@ def map_files_to_functions(files, deps):
 
     return sorted(set(changed_funcs))
 
-def get_changed_functions(deps, ref="HEAD"):
+def get_changed_functions(deps, ref=None, cwd=None):
     """
     Main entry point: Retrieves changed files and maps them to affected functions.
     """
-    files = get_changed_files(ref)
+    files = get_changed_files(ref, cwd=cwd)
     return map_files_to_functions(files, deps)

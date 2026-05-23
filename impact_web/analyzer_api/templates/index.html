@@ -139,6 +139,37 @@
       flex-wrap: wrap;
     }
 
+    .toggle-field {
+      align-self: end;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 0 14px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 14px;
+      background: rgba(3, 8, 18, 0.6);
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .toggle span {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
     button {
       border: 0;
       padding: 14px 16px;
@@ -374,6 +405,14 @@
         <button id="analyzeBtn" type="button" class="secondary">Analyze Project</button>
         <button id="timelineBtn" type="button" class="secondary">Timeline</button>
       </div>
+
+      <div class="field toggle-field">
+        <label class="label" for="compactToggle">Graph density</label>
+        <label class="toggle" for="compactToggle">
+          <input id="compactToggle" type="checkbox" checked />
+          <span>Compact view</span>
+        </label>
+      </div>
     </section>
 
     <div class="card legend-card">
@@ -391,7 +430,7 @@
         <div class="card-header">
           <div>
             <h2>Graph</h2>
-            <div class="card-meta">Node size reflects connectivity. Color reflects risk and changes.</div>
+            <div class="card-meta" id="graphMeta">Node size reflects connectivity. Color reflects risk and changes.</div>
           </div>
           <div class="legend" aria-label="Legend">
             <span class="chip"><span class="dot low"></span>Low risk</span>
@@ -455,21 +494,25 @@
     let cyAfter = null;
     let changedNodes = [];
     let currentMode = "analyze"; // "analyze" | "timeline"
+    let compactView = true;
     let searchTimer = null;
     let activeSelection = null;
     let focusedSearchNode = null;
+    let lastAnalyzePayload = { nodes: [], edges: [] };
 
     const out = document.getElementById("out");
     const spinner = document.getElementById("spinner");
     const statusText = document.getElementById("statusText");
     const funcInput = document.getElementById("func");
     const searchInput = document.getElementById("search");
+    const compactToggle = document.getElementById("compactToggle");
     const impactBtn = document.getElementById("impactBtn");
     const reportBtn = document.getElementById("reportBtn");
     const analyzeBtn = document.getElementById("analyzeBtn");
     const timelineBtn = document.getElementById("timelineBtn");
     const mainGraphCard = document.getElementById("mainGraphCard");
     const timelineGraphCard = document.getElementById("timelineGraphCard");
+    const graphMeta = document.getElementById("graphMeta");
 
     impactBtn.addEventListener("click", runImpact);
     reportBtn.addEventListener("click", runReport);
@@ -483,6 +526,12 @@
       if (e.key === "Escape") {
         searchInput.value = "";
         clearFocus();
+      }
+    });
+    compactToggle.addEventListener("change", () => {
+      compactView = compactToggle.checked;
+      if (currentMode === "analyze" && lastAnalyzePayload.nodes.length) {
+        renderGraph(lastAnalyzePayload.nodes, lastAnalyzePayload.edges);
       }
     });
 
@@ -535,6 +584,112 @@
       if (risk > 5) return "#ef4444";
       if (risk > 2) return "#facc15";
       return "#22c55e";
+    }
+
+    function shortLabel(id) {
+      return String(id || "").split("::").pop();
+    }
+
+    function buildGraphView(nodes, edges) {
+      const normalizedNodes = Array.isArray(nodes)
+        ? nodes.map((n) => ({
+            id: n.id,
+            risk: Number(n.risk) || 0
+          }))
+        : [];
+      const normalizedEdges = Array.isArray(edges) ? edges.filter((edge) => Array.isArray(edge) && edge.length >= 2) : [];
+
+      if (!compactView) {
+        return {
+          nodes: normalizedNodes,
+          edges: normalizedEdges,
+          hiddenNodes: 0,
+          hiddenEdges: 0
+        };
+      }
+
+      const nodeMap = new Map(normalizedNodes.map((node) => [node.id, node]));
+      const adjacency = new Map();
+      const changedSet = new Set(changedNodes);
+
+      normalizedNodes.forEach((node) => {
+        adjacency.set(node.id, new Set());
+      });
+
+      normalizedEdges.forEach(([source, target]) => {
+        if (!nodeMap.has(source) || !nodeMap.has(target)) return;
+        adjacency.get(source).add(target);
+        adjacency.get(target).add(source);
+      });
+
+      const visibleIds = new Set();
+      const visited = new Set();
+
+      for (const node of normalizedNodes) {
+        if (visited.has(node.id)) continue;
+
+        const stack = [node.id];
+        const component = [];
+
+        while (stack.length) {
+          const current = stack.pop();
+          if (visited.has(current)) continue;
+
+          visited.add(current);
+          component.push(current);
+
+          const neighbors = adjacency.get(current) || new Set();
+          neighbors.forEach((neighbor) => {
+            if (!visited.has(neighbor)) {
+              stack.push(neighbor);
+            }
+          });
+        }
+
+        const keepComponent =
+          component.length >= 4 ||
+          component.some((id) => changedSet.has(id)) ||
+          component.some((id) => (nodeMap.get(id)?.risk || 0) >= 5);
+
+        if (keepComponent) {
+          component.forEach((id) => visibleIds.add(id));
+        }
+      }
+
+      // If compact filtering removes everything useful, fall back to the full graph.
+      if (!visibleIds.size) {
+        return {
+          nodes: normalizedNodes,
+          edges: normalizedEdges,
+          hiddenNodes: 0,
+          hiddenEdges: 0
+        };
+      }
+
+      const visibleNodes = normalizedNodes.filter((node) => visibleIds.has(node.id));
+      const visibleEdges = normalizedEdges.filter(
+        ([source, target]) => visibleIds.has(source) && visibleIds.has(target)
+      );
+
+      return {
+        nodes: visibleNodes,
+        edges: visibleEdges,
+        hiddenNodes: normalizedNodes.length - visibleNodes.length,
+        hiddenEdges: normalizedEdges.length - visibleEdges.length
+      };
+    }
+
+    function updateGraphMeta(visibleCount, totalCount, hiddenCount, hiddenEdges) {
+      if (!graphMeta) return;
+
+      if (compactView) {
+        graphMeta.textContent =
+          `Compact view showing ${visibleCount} of ${totalCount} nodes. ` +
+          `Hidden ${hiddenCount} low-connectivity nodes and ${hiddenEdges} edges.`;
+      } else {
+        graphMeta.textContent =
+          `Full view showing ${visibleCount} nodes and all available edges.`;
+      }
     }
 
     function formatImpact(data) {
@@ -631,8 +786,12 @@
       try {
         const data = await fetchJson(`/api/analyze/`);
         changedNodes = Array.isArray(data.changed) ? data.changed : [];
+        lastAnalyzePayload = {
+          nodes: Array.isArray(data.nodes) ? data.nodes : [],
+          edges: Array.isArray(data.edges) ? data.edges : []
+        };
         setMode("analyze");
-        renderGraph(data.nodes || [], data.edges || []);
+        renderGraph(lastAnalyzePayload.nodes, lastAnalyzePayload.edges);
         setOutput(JSON.stringify(data.dead_code || {}, null, 2));
       } catch (err) {
         setOutput(`Failed to analyze project.\n${err.message}`);
@@ -748,20 +907,34 @@
         cy = null;
       }
 
+      const graphView = buildGraphView(nodes, edges);
       const container = document.getElementById("graph");
       container.innerHTML = "";
+      updateGraphMeta(
+        graphView.nodes.length,
+        Array.isArray(nodes) ? nodes.length : 0,
+        graphView.hiddenNodes,
+        graphView.hiddenEdges
+      );
 
       cy = cytoscape({
         container,
         elements: [
-          ...nodes.map((n) => ({ data: { id: n.id, risk: Number(n.risk) || 0 } })),
-          ...edges.map((e) => ({ data: { source: e[0], target: e[1] } }))
+          ...graphView.nodes.map((n) => ({
+            data: {
+              id: n.id,
+              risk: Number(n.risk) || 0,
+              shortLabel: shortLabel(n.id)
+            }
+          })),
+          ...graphView.edges.map((e) => ({ data: { source: e[0], target: e[1] } }))
         ],
         style: [
           {
             selector: "node",
             style: {
-              label: (ele) => ele.data("id").split("::").pop(),
+              label: (ele) => (compactView ? "" : ele.data("shortLabel") || shortLabel(ele.data("id"))),
+              "text-opacity": compactView ? 0 : 0.9,
               "background-color": (ele) => {
                 const id = ele.data("id");
                 const r = ele.data("risk");
@@ -782,17 +955,25 @@
               "text-valign": "center",
               "text-halign": "center",
               "font-size": "10px",
-              width: (ele) => 25 + ele.degree() * 4,
-              height: (ele) => 25 + ele.degree() * 4
+              width: (ele) => {
+                const degree = ele.degree();
+                const base = compactView ? 20 : 25;
+                return Math.min(compactView ? 42 : 52, base + Math.sqrt(degree + 1) * 7);
+              },
+              height: (ele) => {
+                const degree = ele.degree();
+                const base = compactView ? 20 : 25;
+                return Math.min(compactView ? 42 : 52, base + Math.sqrt(degree + 1) * 7);
+              }
             }
           },
           {
             selector: "edge",
             style: {
-              width: 2,
-              "curve-style": "bezier",
-              "line-color": "rgba(148, 163, 184, 0.45)",
-              "target-arrow-color": "rgba(148, 163, 184, 0.45)",
+              width: compactView ? 1.25 : 2,
+              "curve-style": compactView ? "straight" : "bezier",
+              "line-color": compactView ? "rgba(148, 163, 184, 0.22)" : "rgba(148, 163, 184, 0.45)",
+              "target-arrow-color": compactView ? "rgba(148, 163, 184, 0.22)" : "rgba(148, 163, 184, 0.45)",
               "target-arrow-shape": "triangle"
             }
           },
@@ -811,7 +992,7 @@
           animate: true,
           animationDuration: 800,
           fit: true,
-          padding: 30
+          padding: compactView ? 50 : 30
         },
         wheelSensitivity: 0.18
       });
@@ -907,14 +1088,16 @@
       cy.on("mouseover", "node", function(evt) {
         const n = evt.target;
         n.style({
-          label: `${n.id()} | risk: ${n.data('risk')}`
+          label: `${shortLabel(n.id())} | risk: ${n.data('risk')}`,
+          "text-opacity": 1
         });
       });
 
       cy.on("mouseout", "node", function(evt) {
         const n = evt.target;
         n.style({
-          label: n.id().split("::").pop()
+          label: compactView ? "" : shortLabel(n.id()),
+          "text-opacity": compactView ? 0 : 0.9
         });
       });
     }
@@ -938,8 +1121,10 @@
           n.style("background-color", "#22c55e");
         }
         n.style({
-          width: 25 + n.degree() * 4,
-          height: 25 + n.degree() * 4
+          width: compactView ? Math.min(42, 20 + Math.sqrt(n.degree() + 1) * 7) : Math.min(52, 25 + Math.sqrt(n.degree() + 1) * 7),
+          height: compactView ? Math.min(42, 20 + Math.sqrt(n.degree() + 1) * 7) : Math.min(52, 25 + Math.sqrt(n.degree() + 1) * 7),
+          label: compactView ? "" : shortLabel(nid),
+          "text-opacity": compactView ? 0 : 0.9
         });
       });
     }

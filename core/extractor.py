@@ -37,6 +37,10 @@ class DependencyExtractor(ast.NodeVisitor):
         """Ensures all paths (local and imported) use the exact same relative format"""
         if not target_path:
             return None
+
+        if not os.path.isabs(target_path):
+            target_path = os.path.join(self.base_dir, target_path)
+
         rel_path = os.path.relpath(target_path, self.base_dir)
         return rel_path.replace("\\", "/")  # Windows fix
 
@@ -109,7 +113,7 @@ class DependencyExtractor(ast.NodeVisitor):
             asname = alias.asname or name
 
             if module:
-                file_path = module_to_file(module)
+                file_path = module_to_file(module, self.base_dir)
                 normalized_path = self._normalize_path(file_path)
 
                 if normalized_path:
@@ -122,7 +126,7 @@ class DependencyExtractor(ast.NodeVisitor):
             name = alias.name
             asname = alias.asname or name
 
-            file_path = module_to_file(name)
+            file_path = module_to_file(name, self.base_dir)
             normalized_path = self._normalize_path(file_path)
 
             if normalized_path:
