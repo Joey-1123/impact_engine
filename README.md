@@ -12,7 +12,7 @@
 
 ##  What is Impact Analyzer?
 
-Impact Analyzer is the current release of a static analysis tool designed to prevent regressions and unseen bugs. By analyzing your codebase, it tracks how functions depend on each other, detects changes via Git, and maps out exactly what will be affected by your latest commit.
+Impact Analyzer is the current release of a Python static analysis tool designed to prevent regressions and unseen bugs. By analyzing your Python codebase, it tracks how functions depend on each other, detects changes via Git, and maps out exactly what will be affected by your latest commit.
 
 The current release is terminal-first: use the CLI for summaries, changed-function analysis, and machine-readable JSON output.
 
@@ -24,7 +24,7 @@ The current release is terminal-first: use the CLI for summaries, changed-functi
 * ** Impact Analysis:** Instantly see what breaks when you modify a specific function.
 * ** Risk Scoring:** Every function gets a dynamic risk score based on how far its impact propagates.
 * ** Smart Filtering:** Cut through the noise and focus only on relevant or high-risk architectural changes.
-* ** Universal Access:** Run it in the terminal via CLI, or seamlessly directly inside your editor with the VS Code Extension.
+* ** Terminal-First Access:** Run it in the terminal via CLI. Optional editor integrations can wrap the CLI later.
 
 ---
 
@@ -175,7 +175,7 @@ If a command says `path does not exist`, pass the target repo with `--project` o
 
 ### VS Code Extension
 
-Optional later. The CLI is the primary product surface now.
+Optional later. The CLI is the primary product surface now, and the current engine only analyzes Python code.
 
 ---
 

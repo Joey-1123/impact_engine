@@ -12,7 +12,7 @@ def read_version():
 setup(
     name="impact-engine",
     version=read_version(),
-    description="Static impact analysis for Python codebases",
+    description="Python static impact analysis for codebases",
     packages=find_packages(),
     include_package_data=True,
     python_requires=">=3.8",
