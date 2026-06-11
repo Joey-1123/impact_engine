@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 import subprocess
 import os
 from typing import Dict, List, Optional, Set, Tuple

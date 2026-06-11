@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 from typing import List, Set
 import networkx as nx
 from core.traversal import get_impact

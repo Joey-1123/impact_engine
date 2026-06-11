@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 """
 ASGI config for impact_web project.
 

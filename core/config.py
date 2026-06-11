@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 import os
 import json
 from typing import Any, Dict, List, Optional

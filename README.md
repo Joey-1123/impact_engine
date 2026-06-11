@@ -42,7 +42,7 @@ Impact Engine is a **static impact analysis tool** that parses your Python codeb
 ## Installation
 
 ```bash
-git clone https://github.com/your-username/impact-engine.git
+git clone https://github.com/Joey-1123/impact_engine.git
 cd impact-engine
 
 python -m venv .venv

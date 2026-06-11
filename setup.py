@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 from pathlib import Path
 from setuptools import setup, find_packages
 

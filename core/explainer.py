@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 from typing import List, Dict, Any, Set
 from networkx.exception import NetworkXNoPath
 from networkx.algorithms.shortest_paths import shortest_path

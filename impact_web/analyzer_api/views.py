@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import os

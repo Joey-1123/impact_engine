@@ -1,3 +1,4 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 import requests
 from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
