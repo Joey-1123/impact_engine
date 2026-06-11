@@ -1,3 +1,6 @@
+from typing import Optional, Set, List, Dict
+import networkx as nx
+
 try:
     from graphviz import Digraph
 except ImportError:
@@ -11,11 +14,11 @@ except ImportError:
     Tree = None
 
 
-def print_impact_tree(graph, target):
+def print_impact_tree(graph: nx.DiGraph, target: str) -> None:
     reversed_graph = graph.reverse()
-    visited = set([target])   # avoid self loop
+    visited: Set[str] = set([target])
 
-    def dfs(node, level=0):
+    def dfs(node: str, level: int = 0) -> None:
         indent = "    " * level
 
         for neighbor in reversed_graph.neighbors(node):
@@ -29,19 +32,13 @@ def print_impact_tree(graph, target):
 
 
 def render_terminal_graph(
-    graph,
-    changed_nodes=None,
-    max_nodes=200,
-    max_depth=4,
-    max_children=12,
-    changed_only=False,
-):
-    """
-    Render a compact dependency graph in the terminal.
-
-    This favors readability over completeness by showing the most connected
-    roots first and limiting depth for very large repositories.
-    """
+    graph: nx.DiGraph,
+    changed_nodes: Optional[Set[str]] = None,
+    max_nodes: int = 200,
+    max_depth: int = 4,
+    max_children: int = 12,
+    changed_only: bool = False,
+) -> None:
     if Console is None or Tree is None:
         print("Rich is not installed, falling back to plain text output.")
         print("Nodes:")
@@ -53,8 +50,8 @@ def render_terminal_graph(
         return
 
     console = Console()
-    changed_nodes = set(changed_nodes or [])
-    focus_nodes = [n for n in changed_nodes if n in graph] if changed_nodes else []
+    changed_nodes_set = set(changed_nodes or [])
+    focus_nodes = [n for n in changed_nodes_set if n in graph] if changed_nodes_set else []
 
     if changed_only and focus_nodes:
         roots = sorted(
@@ -74,9 +71,9 @@ def render_terminal_graph(
 
     tree = Tree(title)
 
-    visited = set()
+    visited: Set[str] = set()
 
-    def add_branch(parent, node, depth):
+    def add_branch(parent, node: str, depth: int) -> None:
         if depth > max_depth:
             parent.add("[dim]…")
             return
@@ -89,7 +86,7 @@ def render_terminal_graph(
 
         label = node.split("::")[-1]
         risk = graph.out_degree(node)
-        if node in changed_nodes:
+        if node in changed_nodes_set:
             prefix = "[magenta]"
             suffix = "[/]"
         elif risk >= 5:
@@ -116,19 +113,55 @@ def render_terminal_graph(
     console.print(tree)
 
 
-def visualize_graph(graph, output_file="graph"):
-    #  SAFE GUARD HERE (correct place)
+def print_complexity_table(
+    function_complexity: Dict[str, int],
+    limit: int = 20,
+) -> None:
+    sorted_funcs = sorted(function_complexity.items(), key=lambda x: -x[1])[:limit]
+    if not sorted_funcs:
+        print("No complexity data available.")
+        return
+
+    print("\nCyclomatic Complexity (top {}):".format(limit))
+    print(f"{'Function':<50} {'Complexity':>10} {'Risk Level':>12}")
+    print("-" * 74)
+    for func, comp in sorted_funcs:
+        if comp >= 10:
+            level = "HIGH"
+        elif comp >= 5:
+            level = "MEDIUM"
+        else:
+            level = "LOW"
+        func_short = func.split("::")[-1] if "::" in func else func
+        print(f"{func_short:<50} {comp:>10} {level:>12}")
+
+
+def print_complexity_json(function_complexity: Dict[str, int], limit: int = 20) -> str:
+    import json
+    sorted_funcs = sorted(function_complexity.items(), key=lambda x: -x[1])[:limit]
+    payload = [
+        {"function": k, "complexity": v}
+        for k, v in sorted_funcs
+    ]
+    return json.dumps(payload, indent=2)
+
+
+def visualize_graph(graph: nx.DiGraph, output_file: str = "graph", max_nodes: int = 500) -> None:
     if Digraph is None:
         print("Graphviz not installed, skipping visualization")
         return
 
     dot = Digraph()
 
-    for node in graph.nodes():
+    nodes = list(graph.nodes())[:max_nodes]
+    node_set = set(nodes)
+
+    for node in nodes:
         dot.node(node)
 
     for edge in graph.edges():
-        dot.edge(edge[0], edge[1])
+        if edge[0] in node_set and edge[1] in node_set:
+            dot.edge(edge[0], edge[1])
 
     try:
         dot.render(output_file, format="png", cleanup=True)

@@ -20,6 +20,7 @@ setup(
         "networkx>=3.6.1",
         "rich>=15.0.0",
         "requests>=2.0.0",
+        "pathspec>=0.12.0",
     ],
     extras_require={
         "web": [

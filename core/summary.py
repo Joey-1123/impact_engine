@@ -1,15 +1,19 @@
+from typing import List, Dict, Any, Optional, Set
+import networkx as nx
 from core.analyzer import calculate_risk
 from core.version import __version__
 
 
-def build_analysis_summary(graph, changed_nodes=None, dead_nodes=None, limit=10):
-    """
-    Build a compact, decision-oriented summary of the current graph.
-    """
+def build_analysis_summary(
+    graph: nx.DiGraph,
+    changed_nodes: Optional[Set[str]] = None,
+    dead_nodes: Optional[List[str]] = None,
+    limit: int = 10,
+) -> Dict[str, Any]:
     changed_set = set(changed_nodes or [])
     dead_nodes = list(dead_nodes or [])
 
-    ranked_nodes = []
+    ranked_nodes: List[Dict[str, Any]] = []
     for node in graph.nodes():
         risk = calculate_risk(graph, node)
         ranked_nodes.append({
@@ -47,10 +51,12 @@ def build_analysis_summary(graph, changed_nodes=None, dead_nodes=None, limit=10)
     }
 
 
-def build_analysis_summary_payload(graph, changed_nodes=None, dead_nodes=None, limit=10):
-    """
-    JSON-friendly summary payload for CI/PR bots.
-    """
+def build_analysis_summary_payload(
+    graph: nx.DiGraph,
+    changed_nodes: Optional[Set[str]] = None,
+    dead_nodes: Optional[List[str]] = None,
+    limit: int = 10,
+) -> Dict[str, Any]:
     summary = build_analysis_summary(
         graph,
         changed_nodes=changed_nodes,

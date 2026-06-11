@@ -1,28 +1,14 @@
-def calculate_risk(graph, target):
-    """
-    Risk = number of downstream impacted nodes
-    """
-    reversed_graph = graph.reverse()
-
-    visited = set()
-    stack = [target]
-
-    while stack:
-        node = stack.pop()
-
-        for neighbor in reversed_graph.neighbors(node):
-            if neighbor not in visited:
-                visited.add(neighbor)
-                stack.append(neighbor)
-
-    return len(visited)
+from typing import List, Set
+import networkx as nx
+from core.traversal import get_impact
 
 
-def find_dead_code(graph, entry_points):
-    """
-    Dead code = nodes NOT reachable from entry points
-    """
-    visited = set()
+def calculate_risk(graph: nx.DiGraph, target: str) -> int:
+    return len(get_impact(graph, target))
+
+
+def find_dead_code(graph: nx.DiGraph, entry_points: List[str]) -> List[str]:
+    visited: Set[str] = set()
     stack = list(entry_points)
 
     while stack:

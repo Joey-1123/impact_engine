@@ -1,13 +1,14 @@
-def get_impact(graph, target):
-    
-    # Reverse graph: callee → caller
-    if target not in graph:
+from typing import Set
+import networkx as nx
+
+
+def get_impact(graph, target: str) -> Set[str]:
+    if not graph.has_node(target):
         return set()
-    
-    
+
     reversed_graph = graph.reverse()
 
-    visited = set()
+    visited: Set[str] = set()
     stack = [target]
 
     while stack:

@@ -58,12 +58,15 @@ jobs:
             let body = ` Impact Report\n\n`;
             body += `Max Risk: ${data.max_risk}\n\n`;
 
-            if (!data.functions || data.functions.length === 0) {
+            if (!data.files || data.files.length === 0) {
               body += `No impacted functions `;
             } else {
-              body += `Changed Functions:\n`;
-              data.functions.forEach(f => {
-                body += `- ${f.function} (risk=${f.risk})\n`;
+              body += `Changed Files:\n`;
+              data.files.forEach(f => {
+                body += `\n${f.file}:\n`;
+                f.functions.forEach(fn => {
+                  body += `  - ${fn.name} (risk=${fn.risk})\n`;
+                });
               });
             }
 

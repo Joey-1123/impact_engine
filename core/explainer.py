@@ -1,8 +1,10 @@
+from typing import List, Dict, Any, Set
+from networkx.exception import NetworkXNoPath
 from networkx.algorithms.shortest_paths import shortest_path
 
 
-def explain_impact(graph, start_node, impacted_nodes):
-    explanations = []
+def explain_impact(graph, start_node: str, impacted_nodes: Set[str]) -> Dict[str, Any]:
+    explanations: List[Dict[str, Any]] = []
 
     total_impact = len(impacted_nodes)
 
@@ -11,7 +13,7 @@ def explain_impact(graph, start_node, impacted_nodes):
             continue
 
         try:
-            path = list(shortest_path(graph, start_node, target))
+            path = list(shortest_path(graph, target, start_node))
 
             if len(path) >= 2:
                 direct = len(path) == 2
@@ -29,10 +31,9 @@ def explain_impact(graph, start_node, impacted_nodes):
                     "depth": len(path) - 1
                 })
 
-        except Exception:
+        except NetworkXNoPath:
             continue
 
-    # Risk reasoning
     if total_impact >= 5:
         severity = "HIGH"
         summary = f"High risk: impacts {total_impact} downstream functions."

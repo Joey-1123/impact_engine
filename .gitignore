@@ -18,6 +18,9 @@ venv/
 dist/
 build/
 
+# Impact Engine cache
+.impact_cache
+
 #variable
 .env
 

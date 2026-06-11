@@ -1,13 +1,15 @@
-def generate_pr_report(changed_funcs, impact_data):
-    report = []
+from typing import List, Dict, Any
+
+
+def generate_pr_report(changed_funcs: List[str], impact_data: List[Dict[str, Any]]) -> str:
+    report: List[str] = []
 
     total_changed = len(changed_funcs)
     total_impacted = sum(len(item["impact"]) for item in impact_data)
 
-    # 🔥 Overall risk
-    if total_impacted >= 10:
+    if total_impacted >= 5:
         overall_risk = "HIGH"
-    elif total_impacted >= 5:
+    elif total_impacted >= 3:
         overall_risk = "MEDIUM"
     else:
         overall_risk = "LOW"
