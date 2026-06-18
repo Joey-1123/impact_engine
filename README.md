@@ -1,7 +1,7 @@
 # Impact Engine
 
 <div align="center">
-  <p><b>Static impact analysis for Python codebases — know your blast radius before you ship.</b></p>
+  <p><b>Static impact analysis for codebases — know your blast radius before you ship.</b></p>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
   [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
@@ -12,7 +12,7 @@
 
 ## What is Impact Engine?
 
-Impact Engine is a **static impact analysis tool** that parses your Python codebase, builds a directed dependency graph of every function, detects changed functions via Git, and calculates exactly what will break. It runs purely on **static analysis** (Python's AST) — no runtime execution, safe for any codebase.
+Impact Engine is a **static impact analysis tool** that parses your codebase, builds a directed dependency graph of every function, detects changed functions via Git, and calculates exactly what will break. It runs purely on **static analysis** (Python AST) — no runtime execution, safe for any codebase.
 
 ---
 
@@ -20,19 +20,22 @@ Impact Engine is a **static impact analysis tool** that parses your Python codeb
 
 - **Dependency Graphing** — Full call-graph extraction at function granularity
 - **Impact Analysis** — `impact-engine impact <func>` shows every affected downstream
+- **What-If Analysis** — `impact-engine predict <func>` simulates changes without touching git
+- **Pre-Commit Hook** — `impact-engine pre-commit` blocks commits with risk above threshold
 - **Risk Scoring** — Blast-radius risk per function (number of impacted callers)
 - **Dead Code Detection** — Finds functions unreachable from entry points
 - **Circular Dependency Detection** — `impact-engine cycles` finds import/function cycles
 - **Cyclomatic Complexity** — `impact-engine complexity` ranks functions by McCabe score
+- **Test Impact Mapping** — `impact-engine impact <func> --test-only` shows only affected tests
 - **Decorator Tracking** — `@app.route(...)` and similar decorators tracked as deps
-- **Line Number Tracking** — Every function node includes its source line
-- **Smart Filtering** — Depth, children, and `--changed-only` flags for large repos
+- **Multi-Language Support** — Plugin architecture with parsers for Python, JS/TS, Rust, Go, Java
+- **HTML Export** — `impact-engine html` generates interactive D3.js dependency graph
 - **Mermaid Export** — `impact-engine mermaid` generates editable Mermaid.js diagrams
 - **SARIF Export** — `impact-engine sarif` outputs GitHub-code-scanning-compatible JSON
 - **Compare Mode** — `impact-engine compare --base main` shows risk delta between branches
-- **Watch Mode** — `impact-engine watch` continuously re-analyzes on file changes
+- **Watch Mode** — `impact-engine watch` / `impact-engine iwatch` continuously re-analyzes on file changes
 - **CI/CD Ready** — Structured JSON output (`--json`) for GitHub Actions bots
-- **Web Dashboard** — Optional Django REST API + Cytoscape.js interactive graph
+- **Web Dashboard** — Optional Django REST API with interactive graph, API key auth, and graph caching
 - **Config File** — `.impactrc` (JSON) or `impact-engine.toml` for project-wide settings
 - **AST Cache** — Incremental mtime-based cache skips unchanged files
 - **.gitignore Aware** — Respects your existing `.gitignore` patterns
@@ -76,6 +79,19 @@ impact-engine summary --json   # CI-ready JSON
 ### Specific function impact
 ```bash
 impact-engine impact <function_name>
+impact-engine impact <func> --test-only   # only affected tests
+```
+
+### What-if analysis (no git needed)
+```bash
+impact-engine predict <function_name>
+impact-engine predict <func> --json
+```
+
+### Pre-commit check
+```bash
+impact-engine pre-commit
+impact-engine pre-commit --threshold 3
 ```
 
 ### Current Git diff
@@ -97,6 +113,7 @@ impact-engine cycles
 ```bash
 impact-engine mermaid > graph.md
 impact-engine sarif > results.sarif
+impact-engine html > report.html
 ```
 
 ### Compare branches
@@ -106,7 +123,8 @@ impact-engine compare --base main
 
 ### Watch for changes
 ```bash
-impact-engine watch
+impact-engine watch          # full re-analysis
+impact-engine iwatch         # incremental (faster for large codebases)
 ```
 
 ### Compact controls
@@ -117,6 +135,12 @@ impact-engine graph --depth 3 --children 12 --changed-only
 ### Point at another repo
 ```bash
 impact-engine summary --project /path/to/other/repo
+```
+
+### Install git hooks
+```bash
+make install-hooks
+# or: sh scripts/install-hooks.sh
 ```
 
 ---
@@ -155,41 +179,98 @@ respect_gitignore = true
 
 ```
 impact_engine/
-├── cli/main.py          # CLI entry point (12 commands)
+├── cli/main.py              # CLI entry point (17 commands)
 ├── core/
-│   ├── extractor.py     # AST dependency extraction + line numbers + complexity
-│   ├── graph_builder.py # NetworkX directed graph
-│   ├── traversal.py     # BFS impact propagation
-│   ├── analyzer.py      # Risk scoring + dead code
-│   ├── explainer.py     # Impact explanation with severity
-│   ├── summary.py       # Ranked summaries + JSON payload
-│   ├── git_analyzer.py  # Git diff → changed functions
-│   ├── file_loader.py   # Python file scanning + .gitignore
-│   ├── path_resolver.py # Module name → file path resolution
-│   ├── visualizer.py    # Rich terminal trees + complexity tables
-│   ├── detector.py      # Cycle detection + entry point discovery
-│   ├── exporter.py      # Mermaid + SARIF export
-│   ├── cache.py         # mtime-based AST cache
-│   ├── config.py        # .impactrc / impact-engine.toml loader
-│   ├── comparator.py    # git merge-base branch comparison
-│   ├── watcher.py       # file-change polling watcher
-│   └── js_extractor.py  # JS/TS dependency extraction
-├── impact_web/          # Optional Django web dashboard
-├── tests/               # 34 tests across 22 test classes
-└── setup.py             # Package config
+│   ├── extractor.py         # AST dependency extraction + line numbers + complexity
+│   ├── graph_builder.py     # NetworkX directed graph
+│   ├── traversal.py         # BFS impact propagation
+│   ├── analyzer.py          # Risk scoring + dead code
+│   ├── explainer.py         # Impact explanation with severity
+│   ├── summary.py           # Ranked summaries + JSON payload
+│   ├── git_analyzer.py      # Git diff → changed functions
+│   ├── file_loader.py       # Python file scanning + .gitignore
+│   ├── path_resolver.py     # Module name → file path resolution
+│   ├── visualizer.py        # Rich terminal trees + complexity tables
+│   ├── detector.py          # Cycle detection + entry point discovery
+│   ├── exporter.py          # Mermaid + SARIF export
+│   ├── html_exporter.py     # Interactive D3.js HTML report
+│   ├── cache.py             # mtime-based AST cache
+│   ├── config.py            # .impactrc / impact-engine.toml loader
+│   ├── comparator.py        # git merge-base branch comparison
+│   ├── watcher.py           # file-change polling watcher (full + incremental)
+│   ├── js_extractor.py      # JS/TS dependency extraction
+│   └── parsers/             # Multi-language parser plugin system
+│       ├── __init__.py      # BaseParser, @register_parser, auto-discovery
+│       ├── python_parser.py # Python (AST)
+│       ├── js_parser.py     # JavaScript/TypeScript (regex)
+│       ├── rust_parser.py   # Rust stub (tree-sitter)
+│       ├── go_parser.py     # Go stub (tree-sitter)
+│       └── java_parser.py   # Java stub (tree-sitter)
+├── impact_web/              # Optional Django web dashboard
+├── tests/                   # 34 tests across 22 test classes
+├── scripts/
+│   ├── git-hooks/pre-commit # Pre-commit hook script
+│   └── install-hooks.sh     # Hook installer
+├── Makefile                 # install-hooks, test, build, clean
+├── .pre-commit-config.yaml  # Pre-commit framework config
+├── .github/workflows/
+│   ├── impact.yml           # CI: analysis, comment, auto-label
+│   └── branch-naming.yml    # Branch naming convention enforcement
+└── setup.py                 # Package config
 ```
 
 ---
 
 ## How It Works
 
-1. **Parse** — Reads Python files via `ast.parse`
+1. **Parse** — Reads files via AST (Python) or plugin parser (JS, Rust, Go, Java)
 2. **Extract** — Walks AST to find function defs, calls, imports, decorators
 3. **Build** — Constructs a `networkx.DiGraph` with caller→callee edges
 4. **Detect** — `git status --porcelain` → changed files → changed functions
 5. **Propagate** — BFS on reversed graph finds all impacted callers
 6. **Score** — `risk = len(get_impact(func))` — count of transitive callers
-7. **Output** — Terminal (Rich), JSON, Mermaid, SARIF
+7. **Output** — Terminal (Rich), JSON, Mermaid, SARIF, HTML (D3.js)
+
+---
+
+## Branch Naming Convention
+
+The project follows an `impact/<type>-<description>` convention for feature/fix branches. The CI enforces:
+
+| Pattern | Purpose |
+|---------|---------|
+| `main` / `master` | Stable releases |
+| `feature/impact-<desc>` or `feat/impact-<desc>` | New features |
+| `fix/impact-<desc>` or `bugfix/impact-<desc>` | Bug fixes |
+| `chore/<desc>` | Maintenance |
+| `refactor/<desc>` | Code refactoring |
+| `docs/<desc>` | Documentation |
+| `test/<desc>` | Testing |
+| `ci/<desc>` | CI/CD changes |
+
+---
+
+## Web Dashboard (Optional)
+
+```bash
+pip install .[web]
+cd impact_web
+python manage.py migrate
+python manage.py runserver
+```
+
+Set environment variables:
+- `DJANGO_SECRET_KEY` — Required. Generate with `python -c 'import secrets; print(secrets.token_urlsafe(50))'`
+- `DJANGO_DEBUG` — Set to `1` for development (defaults to `0`/off in production)
+- `GITHUB_TOKEN` — GitHub PAT for PR commenting
+- `GITHUB_WEBHOOK_SECRET` — Secret for webhook HMAC verification
+- `ANALYZER_API_KEYS` — Comma-separated API keys for endpoint auth
+- `DJANGO_ALLOWED_HOSTS` — Comma-separated allowed hosts
+
+API endpoints:
+- `GET /api/analyze/` — Full analysis (requires API key if configured)
+- `GET /api/impact/?function=<name>` — Function impact (requires API key)
+- `POST /webhook/github/` — GitHub webhook receiver (HMAC-verified)
 
 ---
 
@@ -201,11 +282,31 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 # Build package
 python -m build
+
+# Install git hooks
+make install-hooks
 ```
 
 ---
 
 ## Changelog
+
+### v0.5.0
+- **4 new CLI commands** — `pre-commit`, `predict`, `html`, `iwatch`
+- **`--test-only` flag** on `impact` command — filters results to test files
+- **Pre-commit hook** — `impact-engine pre-commit` blocks commits above risk threshold
+- **What-if analysis** — `impact-engine predict <func>` simulates changes without git
+- **HTML export** — Interactive D3.js force-directed graph with risk coloring
+- **Incremental watch** — `impact-engine iwatch` only re-analyzes changed files
+- **Multi-language parser plugin architecture** — `core/parsers/` with auto-discovery
+- **Plugin parsers** — Python (AST), JS/TS (regex), Rust/Go/Java (stubs for tree-sitter)
+- **Web dashboard** — Graph caching (60s TTL), API key auth (`ANALYZER_API_KEYS`), HMAC webhook
+- **CI improvements** — concurrency, cancel-in-progress, merge queue mode, auto-labeling (risk:low/medium/high, needs-review), live-updating PR comments, artifact upload
+- **Branch naming enforcement** — `.github/workflows/branch-naming.yml`
+- **Git hooks** — `scripts/install-hooks.sh` + `make install-hooks`
+- **VS Code extension stub** — commands for analyze, dependency tree, risk overview
+- **Bug fixes** — branch comparison (3-dot syntax), `--project` flag on impact command, pickle→JSON cache, `\n` in PR comments, HMAC security, DEBUG default, TOCTOU race, non-UTF-8 encoding, exec() in setup.py, confusing git filter, class method resolution, stdlib detection via `sys.stdlib_module_names`
+- **34 tests** — all passing
 
 ### v0.4.0
 - **12 CLI commands** — analyze, graph, summary, impact, diff, complexity, mermaid, sarif, compare, cycles, watch, version
