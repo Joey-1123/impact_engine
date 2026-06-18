@@ -34,7 +34,7 @@ def get_changed_files(ref: Optional[str] = None, cwd: Optional[str] = None) -> L
                 if " -> " in path:
                     path = path.split(" -> ", 1)[-1]
 
-                if status == "??" or status[0] != "D" or status[1] != "D":
+                if status != "DD":
                     files.append(path)
         else:
             result = _run_git(["diff", "--name-only", ref], cwd=cwd)
@@ -70,9 +70,9 @@ def map_files_to_functions(files: List[str], deps: Dict[str, List[str]]) -> List
     changed_funcs: List[str] = []
 
     for func in deps.keys():
-        func_file_path = func.split("::")[0]
+        func_file_path = os.path.normpath(func.split("::")[0])
 
-        if any(f.endswith(func_file_path) for f in files):
+        if any(os.path.normpath(f) == func_file_path for f in files):
             changed_funcs.append(func)
 
     return sorted(set(changed_funcs))

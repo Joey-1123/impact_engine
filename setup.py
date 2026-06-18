@@ -1,13 +1,18 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import re
 from pathlib import Path
 from setuptools import setup, find_packages
 
 
 def read_version():
-    namespace = {}
     version_file = Path(__file__).parent / "core" / "version.py"
-    exec(version_file.read_text(encoding="utf-8"), namespace)
-    return namespace["__version__"]
+    match = re.search(
+        r'__version__\s*=\s*["\']([^"\']+)["\']',
+        version_file.read_text(encoding="utf-8"),
+    )
+    if match:
+        return match.group(1)
+    raise RuntimeError("Unable to find __version__ in core/version.py")
 
 
 setup(
@@ -20,7 +25,7 @@ setup(
     install_requires=[
         "networkx>=3.6.1",
         "rich>=15.0.0",
-        "requests>=2.0.0",
+        "requests>=2.32.0",
         "pathspec>=0.12.0",
     ],
     extras_require={

@@ -1,0 +1,47 @@
+#!/bin/sh
+# impact-engine pre-commit hook
+# Install with: make install-hooks or manually copy to .git/hooks/pre-commit
+
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -z "$PROJECT_ROOT" ]; then
+    exit 0
+fi
+
+cd "$PROJECT_ROOT" || exit 0
+
+# Check if impact-engine is installed
+if ! command -v impact-engine >/dev/null 2>&1; then
+    echo "impact-engine not found, skipping pre-commit check"
+    exit 0
+fi
+
+# Only check staged Python files
+STAGED=$(git diff --cached --name-only --diff-filter=ACM -- '*.py')
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+echo "Running impact-engine pre-commit check..."
+
+THRESHOLD="${1:-5}"
+
+RESULT=$(impact-engine pre-commit --json 2>/dev/null)
+
+if [ $? -ne 0 ]; then
+    echo "impact-engine pre-commit failed"
+    exit 1
+fi
+
+MAX_RISK=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['max_risk'])" 2>/dev/null)
+COMMIT_ALLOWED=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['commit_allowed'])" 2>/dev/null)
+
+if [ "$COMMIT_ALLOWED" = "False" ]; then
+    echo ""
+    echo "ERROR: Pre-commit impact check failed!"
+    echo "Max risk ($MAX_RISK) exceeds threshold ($THRESHOLD)."
+    echo "Run 'impact-engine pre-commit' for details."
+    echo "To bypass: git commit --no-verify"
+    exit 1
+fi
+
+exit 0

@@ -14,9 +14,13 @@ def build_analysis_summary(
     changed_set = set(changed_nodes or [])
     dead_nodes = list(dead_nodes or [])
 
+    risk_cache: Dict[str, int] = {}
+
     ranked_nodes: List[Dict[str, Any]] = []
     for node in graph.nodes():
-        risk = calculate_risk(graph, node)
+        if node not in risk_cache:
+            risk_cache[node] = calculate_risk(graph, node)
+        risk = risk_cache[node]
         ranked_nodes.append({
             "node": node,
             "risk": risk,

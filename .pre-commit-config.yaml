@@ -1,0 +1,24 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-toml
+      - id: check-yaml
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.24.6
+    hooks:
+      - id: typos
+
+  - repo: local
+    hooks:
+      - id: impact-engine
+        name: Impact Engine pre-commit
+        entry: impact-engine pre-commit
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        always_run: true

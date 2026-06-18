@@ -260,7 +260,7 @@ class ExplainerTests(unittest.TestCase):
         import networkx as nx
 
         g = nx.DiGraph()
-        g.add_node("a.py::func")
+        g.add_edge("a.py::func", "a.py::func")
 
         result = explain_impact(g, "a.py::func", {"a.py::func"})
         self.assertEqual(len(result["details"]), 0)
@@ -494,7 +494,7 @@ class ComplexityTests(unittest.TestCase):
                 str(root / "mod.py"), str(root)
             )
             self.assertEqual(complexities.get("mod.py::simple"), 1)
-            self.assertGreaterEqual(complexities.get("mod.py::complex", 0), 4)
+            self.assertEqual(complexities.get("mod.py::complex", 0), 4)
 
 
 class DecoratorTests(unittest.TestCase):
@@ -515,7 +515,7 @@ class DecoratorTests(unittest.TestCase):
                 str(root / "deco.py"), str(root)
             )
             greet_func = [k for k in deps_as_tuples if k.endswith("::greet")]
-            self.assertTrue(len(greet_func) >= 1)
+            self.assertEqual(len(greet_func), 1)
             if greet_func:
                 self.assertIn("deco.py::logger", deps_as_tuples.get(greet_func[0], []))
 
@@ -535,7 +535,7 @@ class CacheTests(unittest.TestCase):
                 str(root), use_cache=True
             )
 
-            (root / ".impact_cache").exists()
+            self.assertTrue((root / ".impact_cache").exists())
 
             deps2, linenos2, comp2 = extract_project_dependencies_cached(
                 str(root), use_cache=True

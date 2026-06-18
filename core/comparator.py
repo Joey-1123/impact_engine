@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 import subprocess
-import os
-from typing import Dict, List, Optional, Set, Tuple
+import sys
+from typing import Dict, Optional
 from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
 from core.git_analyzer import get_changed_functions
@@ -14,11 +14,12 @@ def _git_merge_base(ref_a: str, ref_b: str, cwd: str) -> Optional[str]:
         result = subprocess.run(
             ["git", "merge-base", ref_a, ref_b],
             capture_output=True, text=True, encoding="utf-8", cwd=cwd,
+            timeout=60,
         )
         if result.returncode == 0:
             return result.stdout.strip()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Failed to get merge base: {e}", file=sys.stderr)
     return None
 
 
@@ -32,9 +33,11 @@ def compare_branches(
             result = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
                 capture_output=True, text=True, encoding="utf-8", cwd=project_path,
+                timeout=60,
             )
             head_ref = result.stdout.strip() if result.returncode == 0 else "HEAD"
-        except Exception:
+        except Exception as e:
+            print(f"Failed to resolve HEAD ref: {e}", file=sys.stderr)
             head_ref = "HEAD"
 
     merge_base = _git_merge_base(base_ref, head_ref, project_path)
@@ -48,8 +51,8 @@ def compare_branches(
 
     graph = build_graph(deps)
 
-    base_changed = set(get_changed_functions(deps, ref=merge_base, cwd=project_path))
-    head_changed = set(get_changed_functions(deps, ref=head_ref, cwd=project_path))
+    base_changed = set(get_changed_functions(deps, ref=f"{merge_base}...{base_ref}", cwd=project_path))
+    head_changed = set(get_changed_functions(deps, ref=f"{merge_base}...{head_ref}", cwd=project_path))
 
     new_changes = head_changed - base_changed
     resolved = base_changed - head_changed

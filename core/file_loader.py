@@ -13,8 +13,11 @@ def _load_gitignore(base_dir: str) -> Optional[object]:
         return None
     gitignore_path = os.path.join(base_dir, ".gitignore")
     if os.path.isfile(gitignore_path):
-        with open(gitignore_path, "r", encoding="utf-8", errors="ignore") as f:
-            return pathspec.PathSpec.from_lines("gitignore", f.readlines())
+        try:
+            with open(gitignore_path, "r", encoding="utf-8", errors="ignore") as f:
+                return pathspec.PathSpec.from_lines("gitignore", f.readlines())
+        except PermissionError:
+            return None
     return None
 
 

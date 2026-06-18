@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import json
 import os
-import pickle
+import sys
 from typing import Dict, List, Set, Tuple
 from core.extractor import extract_dependencies
 
@@ -12,19 +13,19 @@ def _cache_path(base_dir: str) -> str:
 def _load_cache(cache_file: str) -> dict:
     if os.path.isfile(cache_file):
         try:
-            with open(cache_file, "rb") as f:
-                return pickle.load(f)
-        except Exception:
-            pass
+            with open(cache_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: failed to load cache: {e}", file=sys.stderr)
     return {}
 
 
 def _save_cache(cache_file: str, cache: dict) -> None:
     try:
-        with open(cache_file, "wb") as f:
-            pickle.dump(cache, f)
-    except Exception:
-        pass
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(cache, f)
+    except Exception as e:
+        print(f"Warning: failed to save cache: {e}", file=sys.stderr)
 
 
 def extract_project_dependencies_cached(
@@ -67,7 +68,7 @@ def extract_project_dependencies_cached(
                         "complexities": complexities,
                     }
             except Exception as e:
-                print(f"Error parsing {file}", file=__import__('sys').stderr)
+                print(f"Error parsing {file}", file=sys.stderr)
                 continue
 
         for func, calls in deps.items():

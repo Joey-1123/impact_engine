@@ -2,7 +2,7 @@
 import ast
 import os
 import sys
-from typing import Any, Optional, Set, Dict, List, Tuple
+from typing import Optional, Set, Dict, List, Tuple
 from core.path_resolver import module_to_file
 
 STDLIB_MODULES = {
@@ -26,18 +26,30 @@ STDLIB_MODULES = {
 }
 
 
+def _is_stdlib_module(module_name: str) -> bool:
+    base = module_name.split(".")[0]
+    if base in STDLIB_MODULES:
+        return True
+    try:
+        return base in sys.stdlib_module_names
+    except AttributeError:
+        return False
+
+
 def _is_name_equals_main(node):
-    return (
-        isinstance(node, ast.If)
-        and isinstance(node.test, ast.Compare)
-        and isinstance(node.test.left, ast.Name)
-        and node.test.left.id == "__name__"
-        and len(node.test.ops) == 1
-        and isinstance(node.test.ops[0], ast.Eq)
-        and len(node.test.comparators) == 1
-        and isinstance(node.test.comparators[0], ast.Constant)
-        and node.test.comparators[0].value == "__main__"
-    )
+    if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
+        return False
+    if len(node.test.ops) != 1 or len(node.test.comparators) != 1:
+        return False
+    if not isinstance(node.test.ops[0], ast.Eq):
+        return False
+    left = node.test.left
+    right = node.test.comparators[0]
+    if isinstance(left, ast.Name) and isinstance(right, ast.Constant):
+        return left.id == "__name__" and right.value == "__main__"
+    if isinstance(right, ast.Name) and isinstance(left, ast.Constant):
+        return left.value == "__main__" and right.id == "__name__"
+    return False
 
 
 def _compute_cyclomatic_complexity(node: ast.FunctionDef) -> int:
@@ -89,6 +101,8 @@ class DependencyExtractor(ast.NodeVisitor):
     def _resolve_relative_module(self, module: str, current_file: str) -> Optional[str]:
         if not module or not module.startswith("."):
             return module
+        if not current_file:
+            return None
         parts = current_file.replace("\\", "/").split("/")
         depth = len(module) - len(module.lstrip("."))
         module_name = module[depth:]
@@ -136,11 +150,14 @@ class DependencyExtractor(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self.defined_functions.add(node.name)
-        func_id = f"{self.file_name}::{node.name}"
+        if self.current_class:
+            func_id = f"{self.file_name}::{self.current_class}.{node.name}"
+        else:
+            func_id = f"{self.file_name}::{node.name}"
         self.function_linenos[func_id] = node.lineno
         self.function_complexity[func_id] = _compute_cyclomatic_complexity(node)
-        self._process_decorators(node)
         self.current_function = func_id
+        self._process_decorators(node)
         if self.current_function not in self.dependencies:
             self.dependencies[self.current_function] = set()
         self.generic_visit(node)
@@ -148,11 +165,14 @@ class DependencyExtractor(ast.NodeVisitor):
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.defined_functions.add(node.name)
-        func_id = f"{self.file_name}::{node.name}"
+        if self.current_class:
+            func_id = f"{self.file_name}::{self.current_class}.{node.name}"
+        else:
+            func_id = f"{self.file_name}::{node.name}"
         self.function_linenos[func_id] = node.lineno
         self.function_complexity[func_id] = _compute_cyclomatic_complexity(node)
-        self._process_decorators(node)
         self.current_function = func_id
+        self._process_decorators(node)
         if self.current_function not in self.dependencies:
             self.dependencies[self.current_function] = set()
         self.generic_visit(node)
@@ -161,6 +181,10 @@ class DependencyExtractor(ast.NodeVisitor):
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         old_class = self.current_class
         self.current_class = node.name
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                method_id = f"{self.file_name}::{self.current_class}.{child.name}"
+                self.defined_functions.add(method_id)
         self.generic_visit(node)
         self.current_class = old_class
 
@@ -169,12 +193,11 @@ class DependencyExtractor(ast.NodeVisitor):
             old_in_main = self._in_main_block
             self._in_main_block = True
             for stmt in node.body:
-                if isinstance(stmt, (ast.Expr, ast.Assign)):
-                    for child in ast.walk(stmt):
-                        if isinstance(child, ast.Call):
-                            caller_name = self._get_call_name(child)
-                            if caller_name and caller_name in self.defined_functions:
-                                self.main_block_functions.add(f"{self.file_name}::{caller_name}")
+                for child in ast.walk(stmt):
+                    if isinstance(child, ast.Call):
+                        caller_name = self._get_call_name(child)
+                        if caller_name and caller_name in self.defined_functions:
+                            self.main_block_functions.add(f"{self.file_name}::{caller_name}")
             self.generic_visit(node)
             self._in_main_block = old_in_main
         else:
@@ -190,18 +213,22 @@ class DependencyExtractor(ast.NodeVisitor):
                     namespaced_call = self.imports[func_name]
 
                 elif "." in func_name:
-                    module, func = func_name.split(".", 1)
+                    module, call_func = func_name.split(".", 1)
 
                     if module in self.imports:
                         base = self.imports[module]
                         if "::" not in base:
-                            namespaced_call = f"{base}::{func}"
+                            namespaced_call = f"{base}::{call_func}"
                         else:
-                            namespaced_call = base
+                            base_file = base.split("::")[0]
+                            namespaced_call = f"{base_file}::{call_func}"
 
                     elif module in ("self", "cls") and self.current_class:
-                        if func in self.defined_functions:
-                            namespaced_call = f"{self.file_name}::{func}"
+                        method = f"{self.current_class}.{call_func}"
+                        if method in self.defined_functions:
+                            namespaced_call = f"{self.file_name}::{method}"
+                        elif call_func in self.defined_functions:
+                            namespaced_call = f"{self.file_name}::{method}"
 
                 else:
                     if func_name in self.defined_functions:
@@ -225,8 +252,7 @@ class DependencyExtractor(ast.NodeVisitor):
                 continue
 
             if module:
-                module_name = module.split(".")[0]
-                if module_name in STDLIB_MODULES:
+                if _is_stdlib_module(module):
                     continue
 
                 file_path = module_to_file(module, self.base_dir)
@@ -242,8 +268,7 @@ class DependencyExtractor(ast.NodeVisitor):
             name = alias.name
             asname = alias.asname or name
 
-            base_module = name.split(".")[0]
-            if base_module in STDLIB_MODULES:
+            if _is_stdlib_module(name):
                 continue
 
             file_path = module_to_file(name, self.base_dir)
@@ -266,7 +291,7 @@ class DependencyExtractor(ast.NodeVisitor):
 
 
 def extract_dependencies(file_path: str, base_dir: str) -> Tuple[Dict[str, List[str]], Set[str], Dict[str, int], Dict[str, int]]:
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8", errors="surrogateescape") as f:
         tree = ast.parse(f.read())
 
     extractor = DependencyExtractor(file_path, base_dir)

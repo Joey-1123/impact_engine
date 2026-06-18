@@ -1,9 +1,9 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 import os
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-CONFIG_FILES = [".impactrc", ".impactrc.json", "impact-engine.json", "impact-engine.toml"]
+CONFIG_FILES = (".impactrc", ".impactrc.json", "impact-engine.json", "impact-engine.toml")
 
 
 def _find_config(path: str) -> Optional[str]:
@@ -29,6 +29,8 @@ def _parse_toml(file_path: str) -> dict:
                 return tomli.load(f)
         except ImportError:
             pass
+    except Exception:
+        pass
     return {}
 
 
@@ -53,8 +55,11 @@ def load_config(path: str) -> Dict[str, Any]:
 
     section = raw.get("impact-engine", raw)
 
+    raw_dirs = section.get("ignore_dirs", [])
+    if isinstance(raw_dirs, str):
+        raw_dirs = [raw_dirs]
     return {
-        "ignore_dirs": set(section.get("ignore_dirs", [])),
+        "ignore_dirs": set(raw_dirs),
         "entry_points": section.get("entry_points", []),
         "max_depth": section.get("max_depth", 3),
         "max_children": section.get("max_children", 12),

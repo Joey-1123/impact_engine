@@ -13,6 +13,10 @@ def find_cycles(graph: nx.DiGraph) -> List[List[str]]:
     return cycles
 
 
+ENTRY_POINT_PATTERNS = {"::main", "::run", "::entrypoint", "::start"}
+ENTRY_POINT_DECORATORS = {"click.command", "typer.command", "fire.Fire"}
+
+
 def find_entry_points(
     graph: nx.DiGraph,
     main_block_functions: Optional[Set[str]] = None,
@@ -20,7 +24,9 @@ def find_entry_points(
     entry_points: List[str] = []
 
     for n in graph.nodes():
-        if n.endswith("::main"):
+        name = n.split("::")[-1]
+        func_name = name.split(".")[-1] if "." in name else name
+        if func_name in {"main", "run", "entrypoint", "start"}:
             entry_points.append(n)
 
     if not entry_points:

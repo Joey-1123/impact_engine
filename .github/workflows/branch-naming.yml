@@ -1,0 +1,52 @@
+# Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+name: Branch Naming Convention
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const patterns = [
+              /^(main|master|develop)$/,
+              /^(feature|feat)\/impact-[a-z0-9._-]+$/i,
+              /^(fix|bugfix)\/impact-[a-z0-9._-]+$/i,
+              /^(chore|refactor|docs|test|ci)\/[a-z0-9._-]+$/i,
+              /^dependabot\/.+$/,
+            ];
+
+            const match = patterns.some(p => p.test(branch));
+
+            if (!match) {
+              const body = `## Branch Naming Convention\n\n`
+                + `Branch \`${branch}\` does not follow the expected naming convention.\n\n`
+                + `**Expected patterns:**\n`
+                + `- \`feature/impact-<description>\` — New features\n`
+                + `- \`fix/impact-<description>\` — Bug fixes\n`
+                + `- \`chore/<description>\` — Maintenance\n`
+                + `- \`refactor/<description>\` — Code refactoring\n`
+                + `- \`docs/<description>\` — Documentation\n`
+                + `- \`test/<description>\` — Testing\n`
+                + `- \`ci/<description>\` — CI changes\n\n`
+                + `Please rename your branch to match one of these patterns.`;
+
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body,
+              });
+
+              core.setFailed(`Branch '${branch}' does not follow naming convention`);
+            }

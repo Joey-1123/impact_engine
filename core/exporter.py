@@ -1,10 +1,10 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 import json
-import os
 from typing import Dict, List, Set
+import networkx as nx
 
 
-def export_mermaid(graph) -> str:
+def export_mermaid(graph: nx.DiGraph) -> str:
     lines = ["graph TD"]
     for u, v in graph.edges():
         u_label = u.split("::")[-1].replace("(", "_").replace(")", "_").replace("-", "_")
@@ -13,7 +13,7 @@ def export_mermaid(graph) -> str:
     return "\n".join(lines)
 
 
-def export_mermaid_with_changes(graph, changed_nodes: Set[str] = None) -> str:
+def export_mermaid_with_changes(graph: nx.DiGraph, changed_nodes: Set[str] = None) -> str:
     changed_set = set(changed_nodes or [])
     lines = ["graph TD"]
     for u, v in graph.edges():
@@ -29,13 +29,12 @@ def export_mermaid_with_changes(graph, changed_nodes: Set[str] = None) -> str:
         ]
         for cid in changed_ids:
             lines.append(f"    class {cid} changed;")
-        if any(n in changed_set for u, v in graph.edges() for n in (u, v)):
-            lines.append("    classDef changed fill:#ff6666,stroke:#333,stroke-width:2px;")
+        lines.append("    classDef changed fill:#ff6666,stroke:#333,stroke-width:2px;")
     return "\n".join(lines)
 
 
 def export_sarif(
-    graph,
+    graph: nx.DiGraph,
     changed_nodes: List[str] = None,
     dead_nodes: List[str] = None,
     tool_name: str = "impact-engine",

@@ -34,7 +34,7 @@ if not SECRET_KEY:
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "1") not in {"0", "false", "False"}
+DEBUG = os.getenv("DJANGO_DEBUG", "0") not in {"0", "false", "False"}
 
 ALLOWED_HOSTS = [host for host in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if host]
 

@@ -8,9 +8,10 @@ def generate_pr_report(changed_funcs: List[str], impact_data: List[Dict[str, Any
     total_changed = len(changed_funcs)
     total_impacted = sum(len(item["impact"]) for item in impact_data)
 
-    if total_impacted >= 5:
+    max_risk = max((item.get("risk", 0) for item in impact_data), default=0)
+    if max_risk >= 5 or total_impacted >= 5:
         overall_risk = "HIGH"
-    elif total_impacted >= 3:
+    elif max_risk >= 3 or total_impacted >= 3:
         overall_risk = "MEDIUM"
     else:
         overall_risk = "LOW"
@@ -22,15 +23,15 @@ def generate_pr_report(changed_funcs: List[str], impact_data: List[Dict[str, Any
     report.append(f"Overall Risk: {overall_risk}\n")
 
     for item in impact_data:
-        report.append(f"\nFunction: {item['function']}")
-        report.append(f"Risk Score: {item['risk']}")
+        report.append(f"\nFunction: {item.get('function', 'unknown')}")
+        report.append(f"Risk Score: {item.get('risk', 0)}")
 
         report.append("Impacts:")
-        for i in item["impact"]:
+        for i in item.get("impact", []):
             report.append(f"  - {i}")
 
         report.append("Why:")
-        for e in item["explanation"]["details"]:
-            report.append(f"  • {e['reason']}")
+        for e in item.get("explanation", {}).get("details", []):
+            report.append(f"  • {e.get('reason', 'unknown')}")
 
     return "\n".join(report)

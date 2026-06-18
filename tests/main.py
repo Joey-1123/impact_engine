@@ -1,5 +1,5 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
-from utils.helpers import process
+# Test support runner - not imported by test suite directly
 
 def run():
-    process()
+    pass

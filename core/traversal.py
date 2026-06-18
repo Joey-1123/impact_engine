@@ -3,7 +3,7 @@ from typing import Set
 import networkx as nx
 
 
-def get_impact(graph, target: str) -> Set[str]:
+def get_impact(graph: nx.DiGraph, target: str) -> Set[str]:
     if not graph.has_node(target):
         return set()
 

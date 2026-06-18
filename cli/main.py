@@ -14,6 +14,7 @@ from core.config import load_config, merge_config
 from core.comparator import compare_branches
 from core.exporter import export_mermaid, export_mermaid_with_changes, export_sarif
 from core.detector import find_cycles, find_entry_points
+from core.html_exporter import export_html
 
 
 def safe_print(json_output, *args, **kwargs):
@@ -86,7 +87,8 @@ def _run_analysis(project_path, use_cache=True):
         try:
             from core.cache import extract_project_dependencies_cached
             deps, linenos, complexities = extract_project_dependencies_cached(project_path, use_cache=True)
-        except Exception:
+        except Exception as e:
+            print(f"Warning: cache read failed ({e}), falling back to uncached extraction", file=sys.stderr)
             deps, linenos, complexities = extract_project_dependencies_rich(project_path)
     else:
         deps, linenos, complexities = extract_project_dependencies_rich(project_path)
@@ -211,7 +213,7 @@ def summary_command(project_path, *, json_output=False, limit=10):
             print(f"- {node}")
 
 
-def impact_command(project_path, target):
+def impact_command(project_path, target, test_only=False):
     from core.visualizer import print_impact_tree
 
     deps, graph, *_ = _run_analysis(project_path)
@@ -223,11 +225,21 @@ def impact_command(project_path, target):
         return
 
     for match in matches:
-        print(f"\nImpact Tree for '{match}':")
-        print_impact_tree(graph, match)
+        impacted = list(get_impact(graph, match))
 
-        risk = calculate_risk(graph, match)
-        print(f"Risk Score for '{match}': {risk}")
+        if test_only:
+            impacted = [n for n in impacted if n.split("::")[0].startswith("test")]
+
+        print(f"\nImpact Tree for '{match}':")
+        if test_only:
+            for func in impacted:
+                print(f"├── {func}")
+            print(f"\nTest impact: {len(impacted)} test(s) affected")
+        else:
+            print_impact_tree(graph, match)
+
+            risk = calculate_risk(graph, match)
+            print(f"Risk Score for '{match}': {risk}")
 
 
 def diff_command(project_path, json_output=False):
@@ -396,15 +408,125 @@ def cycles_command(project_path, json_output=False):
         print(f"  Cycle {i}: {' -> '.join(c.split('::')[-1] for c in cycle)}")
 
 
-def watch_command(project_path, max_depth=3, max_children=12):
-    from core.watcher import watch
+def html_command(project_path, output_file=None):
+    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path)
+
+    max_risk = 0
+    for func in changed_funcs:
+        risk = calculate_risk(graph, func)
+        max_risk = max(max_risk, risk)
+
+    html = export_html(
+        graph,
+        project=os.path.basename(project_path),
+        version=__version__,
+        changed_nodes=set(changed_funcs),
+        dead_nodes=dead_nodes,
+        cycles=cycles,
+        max_risk=max_risk,
+    )
+
+    if output_file:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(html)
+        print(f"Exported to {output_file}")
+    else:
+        print(html)
+
+
+def precommit_command(project_path, threshold=5, json_output=False):
+    import subprocess
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        capture_output=True, text=True, encoding="utf-8", cwd=project_path,
+    )
+    staged_files = [f for f in result.stdout.strip().splitlines() if f.endswith(".py")]
+    if not staged_files:
+        safe_print(json_output, "No staged Python files.")
+        return 0
+
+    deps = extract_project_dependencies(project_path)
+    if not deps:
+        safe_print(json_output, "No Python files found.")
+        return 0
+
+    graph = build_graph(deps)
+
+    changed_funcs = []
+    for func in deps.keys():
+        func_file = func.split("::")[0]
+        if any(os.path.normpath(f) == os.path.normpath(func_file) for f in staged_files):
+            changed_funcs.append(func)
+
+    max_risk = 0
+    risks = {}
+    for func in changed_funcs:
+        risk = calculate_risk(graph, func)
+        risks[func] = risk
+        max_risk = max(max_risk, risk)
+
+    if json_output:
+        sys.stdout.write(json.dumps({
+            "max_risk": max_risk,
+            "threshold": threshold,
+            "functions": {k: v for k, v in sorted(risks.items(), key=lambda x: -x[1])},
+            "commit_allowed": max_risk <= threshold,
+        }, indent=2))
+        sys.stdout.flush()
+    else:
+        print(f"\nPre-commit Impact Check:")
+        print(f"  Staged files: {len(staged_files)}")
+        print(f"  Changed functions: {len(changed_funcs)}")
+        print(f"  Max risk: {max_risk}")
+        print(f"  Threshold: {threshold}")
+        if max_risk > threshold:
+            print(f"\n  FAILED: Max risk ({max_risk}) exceeds threshold ({threshold})")
+            for func, risk in sorted(risks.items(), key=lambda x: -x[1]):
+                print(f"    - {func} (risk={risk})")
+        else:
+            print(f"\n  PASSED")
+
+    return 1 if max_risk > threshold else 0
+
+
+def predict_command(project_path, target, json_output=False):
+    deps, graph, *_ = _run_analysis(project_path)
+
+    matches = [n for n in graph.nodes() if n.endswith(f"::{target}")]
+
+    if not matches:
+        safe_print(json_output, f"Function '{target}' not found.")
+        return
+
+    for match in matches:
+        impacted = list(get_impact(graph, match))
+        risk = len(impacted)
+        if json_output:
+            sys.stdout.write(json.dumps({
+                "function": match,
+                "risk": risk,
+                "impacted": impacted,
+            }, indent=2))
+            sys.stdout.flush()
+        else:
+            print(f"\nWhat-if analysis for '{match}':")
+            print(f"  Risk score: {risk}")
+            print(f"  Impacted functions ({len(impacted)}):")
+            for i in impacted[:20]:
+                print(f"    - {i}")
+            if len(impacted) > 20:
+                print(f"    ... {len(impacted) - 20} more")
+
+
+def incremental_watch_command(project_path, max_depth=3, max_children=12):
+    from core.watcher import incremental_watch
 
     def on_change(changed_files):
         print(f"\n[{len(changed_files)} file(s) changed] Re-running analysis...\n")
         analyze_command(project_path, max_depth=max_depth, max_children=max_children, changed_only=True)
 
     print(f"Watching {project_path} for changes... (Ctrl+C to stop)")
-    watch(project_path, on_change)
+    incremental_watch(project_path, on_change)
 
 
 def main():
@@ -421,14 +543,12 @@ def main():
     command = sys.argv[1]
 
     if command == "impact":
-        if len(sys.argv) < 3:
+        project_path = _resolve_project_path(sys.argv)
+        positional_args = [a for a in sys.argv[2:] if not a.startswith("--")]
+        if not positional_args:
             print("Usage: impact-engine impact <function>")
             return
-        target = sys.argv[2]
-        if target.startswith("--"):
-            print("Usage: impact-engine impact <function>")
-            return
-        project_path = _get_flag_value(sys.argv, "--project", "-p") or os.getcwd()
+        target = positional_args[0]
     else:
         project_path = _resolve_project_path(sys.argv)
 
@@ -468,7 +588,8 @@ def main():
         )
 
     elif command == "impact":
-        impact_command(project_path, target)
+        test_only = _has_flag(sys.argv, "--test-only", "-t")
+        impact_command(project_path, target, test_only=test_only)
 
     elif command == "diff":
         json_flag = any(opt in sys.argv for opt in ["--json", "--jsonc"])
@@ -496,10 +617,30 @@ def main():
     elif command == "watch":
         watch_command(project_path, max_depth=max_depth, max_children=max_children)
 
+    elif command in ("iwatch", "incremental-watch"):
+        incremental_watch_command(project_path, max_depth=max_depth, max_children=max_children)
+
+    elif command == "pre-commit":
+        threshold = _parse_int_flag(sys.argv, "--threshold", "-t", default=5)
+        exit_code = precommit_command(project_path, threshold=threshold, json_output=summary_json)
+        sys.exit(exit_code)
+
+    elif command == "predict":
+        positional_args = [a for a in sys.argv[2:] if not a.startswith("--")]
+        if not positional_args:
+            print("Usage: impact-engine predict <function>")
+            return
+        predict_command(project_path, positional_args[0], json_output=summary_json)
+
+    elif command == "html":
+        output = _get_flag_value(sys.argv, "--output", "-o")
+        html_command(project_path, output_file=output)
+
     else:
         print(f"Unknown command: {command}")
         print("Commands: analyze, graph, summary, impact, diff, complexity,")
-        print("          mermaid, sarif, compare, cycles, version, watch")
+        print("          mermaid, sarif, compare, cycles, version, watch,")
+        print("          pre-commit, predict, html, iwatch")
 
 
 if __name__ == "__main__":

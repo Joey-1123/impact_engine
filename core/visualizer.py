@@ -9,6 +9,7 @@ except ImportError:
 
 try:
     from rich.console import Console
+    from rich.markup import escape
     from rich.tree import Tree
 except ImportError:
     Console = None
@@ -85,7 +86,7 @@ def render_terminal_graph(
 
         visited.add(node)
 
-        label = node.split("::")[-1]
+        label = escape(node.split("::")[-1])
         risk = graph.out_degree(node)
         if node in changed_nodes_set:
             prefix = "[magenta]"

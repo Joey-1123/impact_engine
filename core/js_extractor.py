@@ -11,6 +11,7 @@ def extract_js_dependencies(file_path: str, base_dir: str) -> Dict[str, List[str
 
     func_pattern = re.compile(r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)")
     arrow_func = re.compile(r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(?")
+    js_keywords = {"if", "for", "while", "switch", "catch", "return", "throw", "new", "delete", "typeof", "void"}
     class_method = re.compile(r"^\s*(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{")
     require_pattern = re.compile(r"(?:const|let|var)\s+(\w+)\s*=\s*require\(['\"]([^'\"]+)['\"]\)")
     import_pattern = re.compile(r"import\s+(?:\*\s+as\s+)?(\w+)\s+from\s+['\"]([^'\"]+)['\"]")
@@ -35,6 +36,13 @@ def extract_js_dependencies(file_path: str, base_dir: str) -> Dict[str, List[str
 
         m = arrow_func.search(line)
         if m:
+            current_function = f"{rel_path}::{m.group(1)}"
+            if current_function not in dependencies:
+                dependencies[current_function] = set()
+            continue
+
+        m = class_method.search(line)
+        if m and m.group(1) not in js_keywords:
             current_function = f"{rel_path}::{m.group(1)}"
             if current_function not in dependencies:
                 dependencies[current_function] = set()

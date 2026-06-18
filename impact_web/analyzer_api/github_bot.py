@@ -1,4 +1,5 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import sys
 import requests
 from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
@@ -50,7 +51,11 @@ def post_comment(repo, pr_number, report, token):
     }
 
     data = {
-        "body": f"```\\n{report}\\n```"
+        "body": f"```\n{report}\n```"
     }
 
-    requests.post(url, headers=headers, json=data)
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"Failed to post GitHub comment: {e}", file=sys.stderr)

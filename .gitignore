@@ -3,31 +3,41 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+*.egg
 
 # Virtual Environment
 venv/
+.venv/
 
 # VS Code
 .vscode/
 
+# IDE
+.idea/
+*.swp
+*.swo
+
 # OS
 .DS_Store
+Thumbs.db
 
 # Build
-*.egg-info/
 dist/
 build/
 
 # Impact Engine cache
 .impact_cache
 
-#variable
-.env
+# Cache directories
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
 
-#db
-
-__pycache__/
-*.pyc
+# Database
+*.sqlite3
 db.sqlite3
-venv/
+
+# Environment
 .env
