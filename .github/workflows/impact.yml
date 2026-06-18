@@ -65,14 +65,9 @@ jobs:
           cat result.json
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            MAX_RISK=$(python -c "
-import json
-d = json.load(open('result.json'))
-risks = list(d.get('new_risks', {}).values()) + list(d.get('still_risks', {}).values())
-print(max(risks) if risks else 0)
-")
+            MAX_RISK=$(python3 -c "import json; d=json.load(open('result.json')); risks=list(d.get('new_risks',{}).values())+list(d.get('still_risks',{}).values()); print(max(risks) if risks else 0)")
           else
-            MAX_RISK=$(python -c "import json; print(json.load(open('result.json'))['max_risk'])")
+            MAX_RISK=$(python3 -c "import json; print(json.load(open('result.json'))['max_risk'])")
           fi
           echo "max_risk=$MAX_RISK" >> $GITHUB_OUTPUT
 
