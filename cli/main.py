@@ -85,7 +85,7 @@ def analyze_command(project_path, *, max_depth=3, max_children=12, changed_only=
     if cycles:
         print("\nCircular dependencies detected:")
         for cycle in cycles[:5]:
-            print(f"  {' -> '.join(c.split('::')[-1] for c in cycle)}")
+            print(f"  {' -> '.join(c for c in cycle)}")
         if len(cycles) > 5:
             print(f"  ... {len(cycles) - 5} more")
 
@@ -132,6 +132,7 @@ def summary_command(project_path, *, json_output=False, limit=10, respect_gitign
         changed_nodes=changed_funcs,
         dead_nodes=dead_nodes,
         limit=limit,
+        complexities=complexities,
     )
 
     if json_output:
@@ -176,7 +177,7 @@ def summary_command(project_path, *, json_output=False, limit=10, respect_gitign
 def impact_command(project_path, target, test_only=False, respect_gitignore=True):
     from core.visualizer import print_impact_tree
 
-    deps, graph, *_ = _run_analysis(project_path, respect_gitignore=respect_gitignore)
+    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     matches = [n for n in graph.nodes() if n.endswith(f"::{target}")]
 
@@ -198,7 +199,7 @@ def impact_command(project_path, target, test_only=False, respect_gitignore=True
         else:
             print_impact_tree(graph, match)
 
-            risk = calculate_risk(graph, match)
+            risk = calculate_risk(graph, match, complexities=complexities)
             print(f"Risk Score for '{match}': {risk}")
 
 
@@ -374,8 +375,9 @@ def html_command(project_path, output_file=None, respect_gitignore=True):
 
     max_risk = 0
     for func in changed_funcs:
-        risk = calculate_risk(graph, func)
+        risk = calculate_risk(graph, func, complexities=complexities)
         max_risk = max(max_risk, risk)
+    )
 
     html = export_html(
         graph,

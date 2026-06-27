@@ -1,9 +1,18 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import hashlib
 import json
 import os
 import sys
 from typing import Dict, List, Set, Tuple
 from core.extractor import extract_dependencies
+
+
+def _file_hash(file_path: str) -> str:
+    h = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _cache_path(base_dir: str) -> str:
@@ -31,6 +40,7 @@ def _save_cache(cache_file: str, cache: dict) -> None:
 def extract_project_dependencies_cached(
     path: str,
     use_cache: bool = True,
+    respect_gitignore: bool = True,
 ) -> Tuple[Dict[str, List[str]], Dict[str, int], Dict[str, int]]:
     from core.file_loader import get_python_files
 
@@ -42,18 +52,17 @@ def extract_project_dependencies_cached(
         files = [path]
         base_dir = os.path.dirname(path) or "."
     else:
-        files = get_python_files(path)
+        files = get_python_files(path, respect_gitignore=respect_gitignore)
         base_dir = path
 
     cache_file = _cache_path(base_dir)
     cache = _load_cache(cache_file) if use_cache else {}
 
     for file in files:
-        file_mtime = os.path.getmtime(file)
         file_key = os.path.relpath(file, base_dir)
 
         cached = cache.get(file_key)
-        if cached and cached.get("mtime") == file_mtime:
+        if cached and cached.get("hash") == _file_hash(file):
             deps = cached["deps"]
             linenos = cached["linenos"]
             complexities = cached["complexities"]
@@ -62,13 +71,13 @@ def extract_project_dependencies_cached(
                 deps, _, linenos, complexities = extract_dependencies(file, base_dir)
                 if use_cache:
                     cache[file_key] = {
-                        "mtime": file_mtime,
+                        "hash": _file_hash(file),
                         "deps": deps,
                         "linenos": linenos,
                         "complexities": complexities,
                     }
             except Exception as e:
-                print(f"Error parsing {file}", file=sys.stderr)
+                print(f"Error parsing {file}: {e}", file=sys.stderr)
                 continue
 
         for func, calls in deps.items():

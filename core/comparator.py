@@ -1,51 +1,30 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import shlex
 import subprocess
 import sys
 from typing import Dict, Optional
 from core.extractor import extract_project_dependencies
 from core.graph_builder import build_graph
-from core.git_analyzer import get_changed_functions
+from core.git_analyzer import get_changed_functions, get_current_branch, get_merge_base
 from core.analyzer import calculate_risk
 from core.detector import find_entry_points
-
-
-def _git_merge_base(ref_a: str, ref_b: str, cwd: str) -> Optional[str]:
-    try:
-        result = subprocess.run(
-            ["git", "merge-base", ref_a, ref_b],
-            capture_output=True, text=True, encoding="utf-8", cwd=cwd,
-            timeout=60,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except Exception as e:
-        print(f"Failed to get merge base: {e}", file=sys.stderr)
-    return None
 
 
 def compare_branches(
     project_path: str,
     base_ref: str = "main",
     head_ref: Optional[str] = None,
+    respect_gitignore: bool = True,
 ) -> Dict:
     if head_ref is None:
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True, text=True, encoding="utf-8", cwd=project_path,
-                timeout=60,
-            )
-            head_ref = result.stdout.strip() if result.returncode == 0 else "HEAD"
-        except Exception as e:
-            print(f"Failed to resolve HEAD ref: {e}", file=sys.stderr)
-            head_ref = "HEAD"
+        head_ref = get_current_branch(cwd=project_path)
 
-    merge_base = _git_merge_base(base_ref, head_ref, project_path)
+    merge_base = get_merge_base(base_ref, head_ref, project_path)
 
     if not merge_base:
         return {"error": f"Could not find merge base between {base_ref} and {head_ref}"}
 
-    deps = extract_project_dependencies(project_path)
+    deps = extract_project_dependencies(project_path, respect_gitignore=respect_gitignore)
     if not deps:
         return {"error": "No Python files found"}
 

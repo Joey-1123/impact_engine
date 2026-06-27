@@ -1,10 +1,11 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import shlex
 import subprocess
 import os
 from typing import Dict, List, Optional, Set
 
 
-def _run_git(args: List[str], cwd: Optional[str] = None) -> subprocess.CompletedProcess:
+def run_git(args: List[str], cwd: Optional[str] = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", *args],
         capture_output=True,
@@ -15,12 +16,34 @@ def _run_git(args: List[str], cwd: Optional[str] = None) -> subprocess.Completed
     )
 
 
+def get_current_branch(cwd: Optional[str] = None) -> str:
+    try:
+        result = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd)
+        return result.stdout.strip() if result.returncode == 0 else "HEAD"
+    except Exception:
+        return "HEAD"
+
+
+def get_merge_base(ref_a: str, ref_b: str, cwd: str) -> Optional[str]:
+    try:
+        result = subprocess.run(
+            ["git", "merge-base", shlex.quote(ref_a), shlex.quote(ref_b)],
+            capture_output=True, text=True, encoding="utf-8", cwd=cwd,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception as e:
+        print(f"Failed to get merge base: {e}", file=sys.stderr)
+    return None
+
+
 def get_changed_files(ref: Optional[str] = None, cwd: Optional[str] = None) -> List[str]:
     try:
         files: List[str] = []
 
         if ref is None:
-            result = _run_git(["status", "--porcelain", "-uall"], cwd=cwd)
+            result = run_git(["status", "--porcelain", "-uall"], cwd=cwd)
             if result.returncode != 0:
                 return []
 
@@ -37,7 +60,7 @@ def get_changed_files(ref: Optional[str] = None, cwd: Optional[str] = None) -> L
                 if status != "DD":
                     files.append(path)
         else:
-            result = _run_git(["diff", "--name-only", ref], cwd=cwd)
+            result = run_git(["diff", "--name-only", shlex.quote(ref)], cwd=cwd)
             if result.returncode != 0:
                 return []
 

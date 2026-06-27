@@ -10,6 +10,7 @@ def build_analysis_summary(
     changed_nodes: Optional[Set[str]] = None,
     dead_nodes: Optional[List[str]] = None,
     limit: int = 10,
+    complexities: Optional[Dict[str, int]] = None,
 ) -> Dict[str, Any]:
     changed_set = set(changed_nodes or [])
     dead_nodes = list(dead_nodes or [])
@@ -19,7 +20,7 @@ def build_analysis_summary(
     ranked_nodes: List[Dict[str, Any]] = []
     for node in graph.nodes():
         if node not in risk_cache:
-            risk_cache[node] = calculate_risk(graph, node)
+            risk_cache[node] = calculate_risk(graph, node, complexities=complexities)
         risk = risk_cache[node]
         ranked_nodes.append({
             "node": node,
