@@ -6,6 +6,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
   [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
   [![Tests](https://img.shields.io/badge/tests-34%20passing-brightgreen)](tests/)
+  [![Code of Conduct](https://img.shields.io/badge/Code%20of%20Conduct-Contributor%20Covenant-blueviolet)](CODE_OF_CONDUCT.md)
 </div>
 
 ---
@@ -22,7 +23,7 @@ Impact Engine is a **static impact analysis tool** that parses your codebase, bu
 - **Impact Analysis** — `impact-engine impact <func>` shows every affected downstream
 - **What-If Analysis** — `impact-engine predict <func>` simulates changes without touching git
 - **Pre-Commit Hook** — `impact-engine pre-commit` blocks commits with risk above threshold
-- **Risk Scoring** — Blast-radius risk per function (number of impacted callers)
+- **Weighted Risk Scoring** — Blast-radius risk per function weighted by cyclomatic complexity
 - **Dead Code Detection** — Finds functions unreachable from entry points
 - **Circular Dependency Detection** — `impact-engine cycles` finds import/function cycles
 - **Cyclomatic Complexity** — `impact-engine complexity` ranks functions by McCabe score
@@ -33,11 +34,11 @@ Impact Engine is a **static impact analysis tool** that parses your codebase, bu
 - **Mermaid Export** — `impact-engine mermaid` generates editable Mermaid.js diagrams
 - **SARIF Export** — `impact-engine sarif` outputs GitHub-code-scanning-compatible JSON
 - **Compare Mode** — `impact-engine compare --base main` shows risk delta between branches
-- **Watch Mode** — `impact-engine watch` / `impact-engine iwatch` continuously re-analyzes on file changes
+- **Watch Mode** — `impact-engine watch` / `impact-engine iwatch` continuously re-analyzes on file changes (watchdog or polling)
 - **CI/CD Ready** — Structured JSON output (`--json`) for GitHub Actions bots
 - **Web Dashboard** — Optional Django REST API with interactive graph, API key auth, and graph caching
 - **Config File** — `.impactrc` (JSON) or `impact-engine.toml` for project-wide settings
-- **AST Cache** — Incremental mtime-based cache skips unchanged files
+- **SHA-256 Content Cache** — Incremental content-hash cache survives `git checkout`
 - **.gitignore Aware** — Respects your existing `.gitignore` patterns
 
 ---
@@ -57,8 +58,11 @@ pip install .
 
 **Optional extras:**
 ```bash
-pip install .[web]     # Django web dashboard
-pip install .[visual]  # Graphviz PNG export
+pip install .[terminal]  # Rich terminal output (recommended)
+pip install .[web]       # Django web dashboard
+pip install .[visual]    # Graphviz PNG export
+pip install .[watch]     # watchdog event-driven file watching
+pip install .[full]      # All extras
 ```
 
 ---
@@ -179,7 +183,7 @@ respect_gitignore = true
 
 ```
 impact_engine/
-├── cli/main.py              # CLI entry point (17 commands)
+├── cli/main.py              # CLI entry point (17 commands, argparse)
 ├── core/
 │   ├── extractor.py         # AST dependency extraction + line numbers + complexity
 │   ├── graph_builder.py     # NetworkX directed graph
@@ -194,10 +198,10 @@ impact_engine/
 │   ├── detector.py          # Cycle detection + entry point discovery
 │   ├── exporter.py          # Mermaid + SARIF export
 │   ├── html_exporter.py     # Interactive D3.js HTML report
-│   ├── cache.py             # mtime-based AST cache
+│   ├── cache.py             # SHA-256 content-hash cache
 │   ├── config.py            # .impactrc / impact-engine.toml loader
 │   ├── comparator.py        # git merge-base branch comparison
-│   ├── watcher.py           # file-change polling watcher (full + incremental)
+│   ├── watcher.py           # file-change watcher (watchdog + polling fallback)
 │   ├── js_extractor.py      # JS/TS dependency extraction
 │   └── parsers/             # Multi-language parser plugin system
 │       ├── __init__.py      # BaseParser, @register_parser, auto-discovery
@@ -207,7 +211,7 @@ impact_engine/
 │       ├── go_parser.py     # Go stub (tree-sitter)
 │       └── java_parser.py   # Java stub (tree-sitter)
 ├── impact_web/              # Optional Django web dashboard
-├── tests/                   # 34 tests across 22 test classes
+├── tests/                   # 34 tests across 22 test classes (+ __init__.py)
 ├── scripts/
 │   ├── git-hooks/pre-commit # Pre-commit hook script
 │   └── install-hooks.sh     # Hook installer
@@ -228,7 +232,7 @@ impact_engine/
 3. **Build** — Constructs a `networkx.DiGraph` with caller→callee edges
 4. **Detect** — `git status --porcelain` → changed files → changed functions
 5. **Propagate** — BFS on reversed graph finds all impacted callers
-6. **Score** — `risk = len(get_impact(func))` — count of transitive callers
+6. **Score** — `risk = impact_count + max(0, complexity - 1)` — count + complexity bonus
 7. **Output** — Terminal (Rich), JSON, Mermaid, SARIF, HTML (D3.js)
 
 ---
@@ -291,6 +295,26 @@ make install-hooks
 
 ## Changelog
 
+### v0.6.0
+- **argparse CLI** — Migrated from hand-rolled flag parsing to `argparse` subparsers
+- **Weighted risk** — Risk score = impact count + cyclomatic complexity bonus
+- **SHA-256 cache** — Content-hash keys survive `git checkout` (no more stale mtime)
+- **watchdog watcher** — Event-driven file watching with polling fallback
+- **Unified git API** — Shared `run_git()`, `get_current_branch()`, `get_merge_base()`
+- **XSS sanitization** — HTML export escapes node IDs via `html.escape()`
+- **Actual SARIF line numbers** — `export_sarif()` now passes `linenos` dict for real line numbers
+- **`rich` moved to extras** — `pip install .[terminal]` (graceful fallback to plain text)
+- **`requests` moved to extras** — Only needed for GitHub bot; `pip install .[web]`
+- **Stub parser warnings** — Go/Rust/Java parsers emit stderr warnings when invoked
+- **Chained call fix** — `a.b.c()` now fully resolves (was truncated to `c`)
+- **IfExp complexity** — Ternary expressions counted in cyclomatic complexity
+- **Missing stdlib modules** — Added 25 missing stdlib modules to hardcoded set
+- **`shlex.quote()`** — Git ref parameters quoted for injection safety
+- **Code of Conduct** — Contributor Covenant added
+- **Security policy** — SECURITY.md with reporting guidelines
+- **`tests/__init__.py`** — Proper test packaging
+- **34 tests** — all passing
+
 ### v0.5.0
 - **4 new CLI commands** — `pre-commit`, `predict`, `html`, `iwatch`
 - **`--test-only` flag** on `impact` command — filters results to test files
@@ -301,11 +325,10 @@ make install-hooks
 - **Multi-language parser plugin architecture** — `core/parsers/` with auto-discovery
 - **Plugin parsers** — Python (AST), JS/TS (regex), Rust/Go/Java (stubs for tree-sitter)
 - **Web dashboard** — Graph caching (60s TTL), API key auth (`ANALYZER_API_KEYS`), HMAC webhook
-- **CI improvements** — concurrency, cancel-in-progress, merge queue mode, auto-labeling (risk:low/medium/high, needs-review), live-updating PR comments, artifact upload
+- **CI improvements** — concurrency, cancel-in-progress, merge queue mode, auto-labeling, live-updating PR comments
 - **Branch naming enforcement** — `.github/workflows/branch-naming.yml`
 - **Git hooks** — `scripts/install-hooks.sh` + `make install-hooks`
 - **VS Code extension stub** — commands for analyze, dependency tree, risk overview
-- **Bug fixes** — branch comparison (3-dot syntax), `--project` flag on impact command, pickle→JSON cache, `\n` in PR comments, HMAC security, DEBUG default, TOCTOU race, non-UTF-8 encoding, exec() in setup.py, confusing git filter, class method resolution, stdlib detection via `sys.stdlib_module_names`
 - **34 tests** — all passing
 
 ### v0.4.0

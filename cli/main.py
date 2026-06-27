@@ -377,7 +377,6 @@ def html_command(project_path, output_file=None, respect_gitignore=True):
     for func in changed_funcs:
         risk = calculate_risk(graph, func, complexities=complexities)
         max_risk = max(max_risk, risk)
-    )
 
     html = export_html(
         graph,
@@ -504,7 +503,10 @@ def incremental_watch_command(project_path, max_depth=3, max_children=12, respec
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="impact-engine")
+    parser = argparse.ArgumentParser(
+        prog="impact-engine",
+        epilog="Built by Shubham Panchal (Joey) — github.com/Joey-1123",
+    )
     parser.add_argument("--version", "-V", action="store_true", help="Show version")
     parser.add_argument("--project", "-p", help="Project path")
 
@@ -575,6 +577,7 @@ def main():
 
     if args.version or args.command == "version":
         print(f"impact-engine {__version__}")
+        print("Built by Shubham Panchal (Joey) — github.com/Joey-1123")
         return
 
     if args.command in (None, "help"):
