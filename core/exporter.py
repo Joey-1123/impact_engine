@@ -19,8 +19,6 @@ def export_mermaid_with_changes(graph: nx.DiGraph, changed_nodes: Set[str] = Non
     for u, v in graph.edges():
         u_label = u.split("::")[-1].replace("(", "_").replace(")", "_").replace("-", "_")
         v_label = v.split("::")[-1].replace("(", "_").replace(")", "_").replace("-", "_")
-        u_style = "classDef changed fill:#f96;" if u in changed_set else ""
-        v_style = "classDef changed fill:#f96;" if v in changed_set else ""
         lines.append(f'    {u_label}["{u.split("::")[-1]}"] --> {v_label}["{v.split("::")[-1]}"]')
     if changed_set:
         changed_ids = [

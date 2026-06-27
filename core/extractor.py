@@ -23,6 +23,11 @@ STDLIB_MODULES = {
     "fnmatch", "linecache", "dis", "tokenize", "keyword", "token",
     "symbol", "symtable", "opcode", "compileall", "py_compile",
     "zipapp", "pdb", "bdb", "cmd", "code", "rlcompleter",
+    "secrets", "zoneinfo", "graphlib", "mailbox", "mimetypes",
+    "smtplib", "poplib", "imaplib", "ftplib", "getpass",
+    "fileinput", "difflib", "operator", "numbers", "unicodedata",
+    "stringprep", "atexit", "optparse", "tabnanny", "pyclbr",
+    "wave", "colorsys", "pickletools", "mailcap", "sndhdr",
 }
 
 
@@ -63,6 +68,8 @@ def _compute_cyclomatic_complexity(node: ast.FunctionDef) -> int:
             complexity += len(child.values) - 1
         elif isinstance(child, ast.Assert):
             complexity += 1
+        elif isinstance(child, ast.IfExp):
+            complexity += 1
     return complexity
 
 
@@ -85,10 +92,10 @@ class DependencyExtractor(ast.NodeVisitor):
             return False
         file_path = path.split("::")[0] if "::" in path else path
         abs_path = os.path.normpath(os.path.join(self.base_dir, file_path))
-        return (
-            os.path.isfile(abs_path)
-            and abs_path.startswith(os.path.normpath(self.base_dir))
-        )
+        base_norm = os.path.normpath(self.base_dir)
+        if base_norm == ".":
+            return os.path.isfile(abs_path)
+        return os.path.isfile(abs_path) and abs_path.startswith(base_norm)
 
     def _normalize_path(self, target_path: str) -> Optional[str]:
         if not target_path:
@@ -227,8 +234,6 @@ class DependencyExtractor(ast.NodeVisitor):
                         method = f"{self.current_class}.{call_func}"
                         if method in self.defined_functions:
                             namespaced_call = f"{self.file_name}::{method}"
-                        elif call_func in self.defined_functions:
-                            namespaced_call = f"{self.file_name}::{method}"
 
                 else:
                     if func_name in self.defined_functions:
@@ -283,9 +288,14 @@ class DependencyExtractor(ast.NodeVisitor):
         if isinstance(node.func, ast.Name):
             return node.func.id
         elif isinstance(node.func, ast.Attribute):
-            value = node.func.value
-            if isinstance(value, ast.Name):
-                return f"{value.id}.{node.func.attr}"
+            parts = []
+            current = node.func
+            while isinstance(current, ast.Attribute):
+                parts.append(current.attr)
+                current = current.value
+            if isinstance(current, ast.Name):
+                parts.append(current.id)
+                return ".".join(reversed(parts))
             return node.func.attr
         return None
 
@@ -306,7 +316,7 @@ def extract_dependencies(file_path: str, base_dir: str) -> Tuple[Dict[str, List[
     return deps, extractor.main_block_functions, extractor.function_linenos, extractor.function_complexity
 
 
-def extract_project_dependencies(path: str) -> Dict[str, List[str]]:
+def extract_project_dependencies(path: str, respect_gitignore: bool = True) -> Dict[str, List[str]]:
     from core.file_loader import get_python_files
 
     all_dependencies: Dict[str, Set[str]] = {}
@@ -315,7 +325,7 @@ def extract_project_dependencies(path: str) -> Dict[str, List[str]]:
         files = [path]
         base_dir = os.path.dirname(path) or "."
     else:
-        files = get_python_files(path)
+        files = get_python_files(path, respect_gitignore=respect_gitignore)
         base_dir = path
 
     for file in files:
@@ -333,7 +343,7 @@ def extract_project_dependencies(path: str) -> Dict[str, List[str]]:
     return {k: list(v) for k, v in all_dependencies.items()}
 
 
-def extract_project_dependencies_rich(path: str) -> Tuple[Dict[str, List[str]], Dict[str, int], Dict[str, int]]:
+def extract_project_dependencies_rich(path: str, respect_gitignore: bool = True) -> Tuple[Dict[str, List[str]], Dict[str, int], Dict[str, int]]:
     from core.file_loader import get_python_files
 
     all_dependencies: Dict[str, Set[str]] = {}
@@ -344,7 +354,7 @@ def extract_project_dependencies_rich(path: str) -> Tuple[Dict[str, List[str]], 
         files = [path]
         base_dir = os.path.dirname(path) or "."
     else:
-        files = get_python_files(path)
+        files = get_python_files(path, respect_gitignore=respect_gitignore)
         base_dir = path
 
     for file in files:
@@ -365,7 +375,7 @@ def extract_project_dependencies_rich(path: str) -> Tuple[Dict[str, List[str]], 
     return {k: list(v) for k, v in all_dependencies.items()}, all_linenos, all_complexities
 
 
-def extract_project_entry_points(path: str) -> List[str]:
+def extract_project_entry_points(path: str, respect_gitignore: bool = True) -> List[str]:
     from core.file_loader import get_python_files
 
     all_entry_points: Set[str] = set()
@@ -374,7 +384,7 @@ def extract_project_entry_points(path: str) -> List[str]:
         files = [path]
         base_dir = os.path.dirname(path) or "."
     else:
-        files = get_python_files(path)
+        files = get_python_files(path, respect_gitignore=respect_gitignore)
         base_dir = path
 
     for file in files:
