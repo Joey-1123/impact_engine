@@ -1,4 +1,5 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import html
 import json
 from typing import Dict, List, Set, Optional
 import networkx as nx
@@ -162,7 +163,7 @@ def export_html(
         links_data.append({"source": u, "target": v})
 
     hotspot_rows = "".join(
-        f"<tr><td>{n['id']}</td><td>{n['risk']}</td>"
+        f"<tr><td>{html.escape(str(n['id']))}</td><td>{n['risk']}</td>"
         f"<td>{graph.out_degree(n['id'])}</td><td>{graph.in_degree(n['id'])}</td>"
         f"<td>{'<span style=\"color:#bc8cff\">yes</span>' if n['changed'] else 'no'}</td></tr>"
         for n in sorted(nodes_data, key=lambda x: -x['risk'])[:50]

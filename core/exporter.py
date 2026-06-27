@@ -35,11 +35,13 @@ def export_sarif(
     graph: nx.DiGraph,
     changed_nodes: List[str] = None,
     dead_nodes: List[str] = None,
+    linenos: Dict[str, int] = None,
     tool_name: str = "impact-engine",
     tool_version: str = "0.3.0",
 ) -> str:
     changed_set = set(changed_nodes or [])
     dead_set = set(dead_nodes or [])
+    linenos_dict = linenos or {}
 
     results = []
 
@@ -67,7 +69,7 @@ def export_sarif(
                     {
                         "physicalLocation": {
                             "artifactLocation": {"uri": file_path},
-                            "region": {"startLine": 1},
+                            "region": {"startLine": linenos_dict.get(node, 1)},
                         }
                     }
                 ],

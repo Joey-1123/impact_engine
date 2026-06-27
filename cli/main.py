@@ -1,4 +1,5 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
+import argparse
 import sys
 import os
 import json
@@ -22,76 +23,35 @@ def safe_print(json_output, *args, **kwargs):
         print(*args, **kwargs)
 
 
-def _get_flag_value(argv, *flags, default=None):
-    for flag in flags:
-        if flag in argv:
-            index = argv.index(flag)
-            if index + 1 < len(argv):
-                value = argv[index + 1]
-                if not value.startswith("--"):
-                    return value
-    return default
-
-
-def _has_flag(argv, *flags):
-    return any(flag in argv for flag in flags)
-
-
-def _parse_int_flag(argv, *flags, default):
-    value = _get_flag_value(argv, *flags, default=str(default))
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _resolve_project_path(argv):
-    project_path = _get_flag_value(argv, "--project", "-p")
-    if project_path:
-        return os.path.abspath(project_path)
-
-    skip_next = False
-    value_flags = {"--project", "-p", "--depth", "--children", "--limit"}
-
-    for token in argv[2:]:
-        if skip_next:
-            skip_next = False
-            continue
-
-        if token in value_flags:
-            skip_next = True
-            continue
-
-        if token.startswith("--"):
-            continue
-
-        return os.path.abspath(token)
-
+def _resolve_project_path(args):
+    path = getattr(args, 'project_path', None) or getattr(args, 'project', None)
+    if path:
+        return os.path.abspath(path)
     return os.getcwd()
 
 
-def _load_and_merge_config(project_path, argv):
+def _load_and_merge_config(project_path, args):
     config = load_config(project_path)
     cli_args = {
-        "max_depth": _parse_int_flag(argv, "--depth", default=config.get("max_depth", 3)),
-        "max_children": _parse_int_flag(argv, "--children", default=config.get("max_children", 12)),
-        "limit": _parse_int_flag(argv, "--limit", default=config.get("limit", 10)),
-        "json_output": _has_flag(argv, "--json", "--jsonc") or config.get("json_output", False),
-        "changed_only": _has_flag(argv, "--changed-only", "--focused"),
+        "max_depth": getattr(args, 'depth', None) or config.get("max_depth", 3),
+        "max_children": getattr(args, 'children', None) or config.get("max_children", 12),
+        "limit": getattr(args, 'limit', None) or config.get("limit", 10),
+        "json_output": getattr(args, 'json_output', False) or config.get("json_output", False),
+        "changed_only": getattr(args, 'changed_only', False),
     }
     return merge_config(cli_args, config)
 
 
-def _run_analysis(project_path, use_cache=True):
+def _run_analysis(project_path, use_cache=True, respect_gitignore=True):
     if use_cache:
         try:
             from core.cache import extract_project_dependencies_cached
-            deps, linenos, complexities = extract_project_dependencies_cached(project_path, use_cache=True)
+            deps, linenos, complexities = extract_project_dependencies_cached(project_path, use_cache=True, respect_gitignore=respect_gitignore)
         except Exception as e:
             print(f"Warning: cache read failed ({e}), falling back to uncached extraction", file=sys.stderr)
-            deps, linenos, complexities = extract_project_dependencies_rich(project_path)
+            deps, linenos, complexities = extract_project_dependencies_rich(project_path, respect_gitignore=respect_gitignore)
     else:
-        deps, linenos, complexities = extract_project_dependencies_rich(project_path)
+        deps, linenos, complexities = extract_project_dependencies_rich(project_path, respect_gitignore=respect_gitignore)
     graph = build_graph(deps)
     changed_funcs = get_changed_functions(deps)
     entry_points = find_entry_points(graph)
@@ -100,10 +60,10 @@ def _run_analysis(project_path, use_cache=True):
     return deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities
 
 
-def analyze_command(project_path, *, max_depth=3, max_children=12, changed_only=False):
+def analyze_command(project_path, *, max_depth=3, max_children=12, changed_only=False, respect_gitignore=True):
     from core.visualizer import render_terminal_graph, print_complexity_table
 
-    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path)
+    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     print("Impact Summary")
     print(f"- Functions: {graph.number_of_nodes()}")
@@ -147,10 +107,10 @@ def analyze_command(project_path, *, max_depth=3, max_children=12, changed_only=
         print(f"- ... {len(dead_nodes) - 10} more")
 
 
-def graph_command(project_path, *, max_depth=4, max_children=12, changed_only=False):
+def graph_command(project_path, *, max_depth=4, max_children=12, changed_only=False, respect_gitignore=True):
     from core.visualizer import render_terminal_graph
 
-    deps = extract_project_dependencies(project_path)
+    deps = extract_project_dependencies(project_path, respect_gitignore=respect_gitignore)
     graph = build_graph(deps)
     changed_funcs = get_changed_functions(deps)
 
@@ -164,8 +124,8 @@ def graph_command(project_path, *, max_depth=4, max_children=12, changed_only=Fa
     )
 
 
-def summary_command(project_path, *, json_output=False, limit=10):
-    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path)
+def summary_command(project_path, *, json_output=False, limit=10, respect_gitignore=True):
+    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     summary = build_analysis_summary(
         graph,
@@ -213,10 +173,10 @@ def summary_command(project_path, *, json_output=False, limit=10):
             print(f"- {node}")
 
 
-def impact_command(project_path, target, test_only=False):
+def impact_command(project_path, target, test_only=False, respect_gitignore=True):
     from core.visualizer import print_impact_tree
 
-    deps, graph, *_ = _run_analysis(project_path)
+    deps, graph, *_ = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     matches = [n for n in graph.nodes() if n.endswith(f"::{target}")]
 
@@ -242,12 +202,12 @@ def impact_command(project_path, target, test_only=False):
             print(f"Risk Score for '{match}': {risk}")
 
 
-def diff_command(project_path, json_output=False):
+def diff_command(project_path, json_output=False, respect_gitignore=True):
     if not project_path or not os.path.exists(project_path):
         safe_print(json_output, f"Error: path does not exist: {project_path}")
         return
 
-    deps = extract_project_dependencies(project_path)
+    deps = extract_project_dependencies(project_path, respect_gitignore=respect_gitignore)
     if not deps:
         safe_print(json_output, f"No Python files found at {project_path}")
         return
@@ -308,10 +268,10 @@ def diff_command(project_path, json_output=False):
     print(f"\nMax Risk: {max_risk}")
 
 
-def complexity_command(project_path, json_output=False, limit=20):
+def complexity_command(project_path, json_output=False, limit=20, respect_gitignore=True):
     from core.visualizer import print_complexity_table, print_complexity_json
 
-    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path)
+    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     if json_output:
         print(print_complexity_json(complexities, limit=limit))
@@ -320,8 +280,8 @@ def complexity_command(project_path, json_output=False, limit=20):
     print_complexity_table(complexities, limit=limit)
 
 
-def mermaid_command(project_path, output_file=None, show_changed=False):
-    deps, graph, changed_funcs, *_ = _run_analysis(project_path)
+def mermaid_command(project_path, output_file=None, show_changed=False, respect_gitignore=True):
+    deps, graph, changed_funcs, *_ = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     if show_changed and changed_funcs:
         output = export_mermaid_with_changes(graph, changed_nodes=set(changed_funcs))
@@ -336,13 +296,14 @@ def mermaid_command(project_path, output_file=None, show_changed=False):
         print(output)
 
 
-def sarif_command(project_path, output_file=None):
-    deps, graph, changed_funcs, entry_points, dead_nodes, *_ = _run_analysis(project_path)
+def sarif_command(project_path, output_file=None, respect_gitignore=True):
+    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     sarif = export_sarif(
         graph,
         changed_nodes=changed_funcs,
         dead_nodes=dead_nodes,
+        linenos=linenos,
         tool_version=__version__,
     )
 
@@ -354,8 +315,8 @@ def sarif_command(project_path, output_file=None):
         print(sarif)
 
 
-def compare_command(project_path, base_ref="main", json_output=False):
-    result = compare_branches(project_path, base_ref=base_ref)
+def compare_command(project_path, base_ref="main", json_output=False, respect_gitignore=True):
+    result = compare_branches(project_path, base_ref=base_ref, respect_gitignore=respect_gitignore)
 
     if json_output:
         print(json.dumps(result, indent=2))
@@ -391,8 +352,8 @@ def compare_command(project_path, base_ref="main", json_output=False):
             print(f"  ... {len(result['resolved_changes']) - 10} more")
 
 
-def cycles_command(project_path, json_output=False):
-    deps, graph, *_ = _run_analysis(project_path)
+def cycles_command(project_path, json_output=False, respect_gitignore=True):
+    deps, graph, *_ = _run_analysis(project_path, respect_gitignore=respect_gitignore)
     cycles = find_cycles(graph)
 
     if json_output:
@@ -408,8 +369,8 @@ def cycles_command(project_path, json_output=False):
         print(f"  Cycle {i}: {' -> '.join(c.split('::')[-1] for c in cycle)}")
 
 
-def html_command(project_path, output_file=None):
-    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path)
+def html_command(project_path, output_file=None, respect_gitignore=True):
+    deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     max_risk = 0
     for func in changed_funcs:
@@ -434,7 +395,7 @@ def html_command(project_path, output_file=None):
         print(html)
 
 
-def precommit_command(project_path, threshold=5, json_output=False):
+def precommit_command(project_path, threshold=5, json_output=False, respect_gitignore=True):
     import subprocess
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
@@ -445,7 +406,7 @@ def precommit_command(project_path, threshold=5, json_output=False):
         safe_print(json_output, "No staged Python files.")
         return 0
 
-    deps = extract_project_dependencies(project_path)
+    deps = extract_project_dependencies(project_path, respect_gitignore=respect_gitignore)
     if not deps:
         safe_print(json_output, "No Python files found.")
         return 0
@@ -489,8 +450,8 @@ def precommit_command(project_path, threshold=5, json_output=False):
     return 1 if max_risk > threshold else 0
 
 
-def predict_command(project_path, target, json_output=False):
-    deps, graph, *_ = _run_analysis(project_path)
+def predict_command(project_path, target, json_output=False, respect_gitignore=True):
+    deps, graph, *_ = _run_analysis(project_path, respect_gitignore=respect_gitignore)
 
     matches = [n for n in graph.nodes() if n.endswith(f"::{target}")]
 
@@ -518,129 +479,187 @@ def predict_command(project_path, target, json_output=False):
                 print(f"    ... {len(impacted) - 20} more")
 
 
-def incremental_watch_command(project_path, max_depth=3, max_children=12):
+def watch_command(project_path, max_depth=3, max_children=12, respect_gitignore=True):
+    from core.watcher import watch
+
+    def on_change(changed_files):
+        print(f"\n[{len(changed_files)} file(s) changed] Re-running analysis...\n")
+        analyze_command(project_path, max_depth=max_depth, max_children=max_children, changed_only=True, respect_gitignore=respect_gitignore)
+
+    print(f"Watching {project_path} for changes... (Ctrl+C to stop)")
+    watch(project_path, on_change)
+
+
+def incremental_watch_command(project_path, max_depth=3, max_children=12, respect_gitignore=True):
     from core.watcher import incremental_watch
 
     def on_change(changed_files):
         print(f"\n[{len(changed_files)} file(s) changed] Re-running analysis...\n")
-        analyze_command(project_path, max_depth=max_depth, max_children=max_children, changed_only=True)
+        analyze_command(project_path, max_depth=max_depth, max_children=max_children, changed_only=True, respect_gitignore=respect_gitignore)
 
     print(f"Watching {project_path} for changes... (Ctrl+C to stop)")
     incremental_watch(project_path, on_change)
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: impact-engine [command] [options]")
-        print("Commands: analyze, graph, summary, impact, diff, complexity,")
-        print("          mermaid, sarif, compare, cycles, version, watch")
-        return
+    parser = argparse.ArgumentParser(prog="impact-engine")
+    parser.add_argument("--version", "-V", action="store_true", help="Show version")
+    parser.add_argument("--project", "-p", help="Project path")
 
-    if _has_flag(sys.argv, "--version", "-V") or sys.argv[1] == "version":
+    sub = parser.add_subparsers(dest="command", help="Available commands")
+
+    p_analyze = sub.add_parser("analyze", help="Full analysis with tree + complexity + dead code")
+    p_analyze.add_argument("--depth", type=int, default=3)
+    p_analyze.add_argument("--children", type=int, default=12)
+    p_analyze.add_argument("--changed-only", "--focused", action="store_true")
+
+    p_graph = sub.add_parser("graph", help="Terminal dependency graph only")
+    p_graph.add_argument("--depth", type=int, default=4)
+    p_graph.add_argument("--children", type=int, default=12)
+    p_graph.add_argument("--changed-only", "--focused", action="store_true")
+
+    p_summary = sub.add_parser("summary", help="Ranked risk hotspots")
+    p_summary.add_argument("--json", "--jsonc", action="store_true", dest="json_output")
+    p_summary.add_argument("--limit", type=int, default=10)
+
+    p_impact = sub.add_parser("impact", help="Show what breaks if function changes")
+    p_impact.add_argument("function", help="Function name to analyze")
+    p_impact.add_argument("--test-only", action="store_true", help="Show only test impact")
+
+    p_diff = sub.add_parser("diff", help="Current working tree changes")
+    p_diff.add_argument("--json", "--jsonc", action="store_true", dest="json_output")
+
+    p_complexity = sub.add_parser("complexity", help="Cyclomatic complexity ranking")
+    p_complexity.add_argument("--json", "--jsonc", action="store_true", dest="json_output")
+    p_complexity.add_argument("--limit", type=int, default=20)
+
+    p_mermaid = sub.add_parser("mermaid", help="Export Mermaid.js diagram")
+    p_mermaid.add_argument("--output", "-o", help="Output file")
+    p_mermaid.add_argument("--changed", "-c", action="store_true", help="Highlight changed nodes")
+
+    p_sarif = sub.add_parser("sarif", help="Export SARIF for GitHub code scanning")
+    p_sarif.add_argument("--output", "-o", help="Output file")
+
+    p_compare = sub.add_parser("compare", help="Risk delta between branches")
+    p_compare.add_argument("--base", default="main", help="Base branch")
+    p_compare.add_argument("--json", "--jsonc", action="store_true", dest="json_output")
+
+    p_cycles = sub.add_parser("cycles", help="Find circular dependencies")
+    p_cycles.add_argument("--json", "--jsonc", action="store_true", dest="json_output")
+
+    p_watch = sub.add_parser("watch", help="Polling watcher")
+    p_watch.add_argument("--depth", type=int, default=3)
+    p_watch.add_argument("--children", type=int, default=12)
+
+    p_iwatch = sub.add_parser("iwatch", aliases=["incremental-watch"], help="Incremental watcher")
+    p_iwatch.add_argument("--depth", type=int, default=3)
+    p_iwatch.add_argument("--children", type=int, default=12)
+
+    p_precommit = sub.add_parser("pre-commit", help="Check staged files against risk threshold")
+    p_precommit.add_argument("--threshold", "-t", type=int, default=5)
+    p_precommit.add_argument("--json", "--jsonc", action="store_true", dest="json_output")
+
+    p_predict = sub.add_parser("predict", help="What-if analysis without git changes")
+    p_predict.add_argument("function", help="Function name to predict")
+    p_predict.add_argument("--json", "--jsonc", action="store_true", dest="json_output")
+
+    p_html = sub.add_parser("html", help="Interactive D3.js HTML report")
+    p_html.add_argument("--output", "-o", help="Output file")
+
+    sub.add_parser("version", help="Print version and exit")
+    sub.add_parser("help", help="Print this help message")
+
+    args = parser.parse_args()
+
+    if args.version or args.command == "version":
         print(f"impact-engine {__version__}")
         return
 
-    command = sys.argv[1]
+    if args.command in (None, "help"):
+        parser.print_help()
+        return
 
-    if command == "impact":
-        project_path = _resolve_project_path(sys.argv)
-        positional_args = [a for a in sys.argv[2:] if not a.startswith("--")]
-        if not positional_args:
-            print("Usage: impact-engine impact <function>")
-            return
-        target = positional_args[0]
-    else:
-        project_path = _resolve_project_path(sys.argv)
+    project_path = _resolve_project_path(args)
 
     if not os.path.exists(project_path):
         print(f"Error: path does not exist: {project_path}")
         return
 
-    cfg = _load_and_merge_config(project_path, sys.argv)
+    cfg = _load_and_merge_config(project_path, args)
 
     max_depth = cfg.get("max_depth", 3)
     max_children = cfg.get("max_children", 12)
     changed_only = cfg.get("changed_only", False)
     summary_json = cfg.get("json_output", False)
     summary_limit = cfg.get("limit", 10)
+    respect_gitignore = cfg.get("respect_gitignore", True)
 
-    if command == "analyze":
+    if args.command == "analyze":
         analyze_command(
             project_path,
             max_depth=max_depth,
             max_children=max_children,
             changed_only=changed_only,
+            respect_gitignore=respect_gitignore,
         )
 
-    elif command == "graph":
+    elif args.command == "graph":
         graph_command(
             project_path,
             max_depth=max_depth,
             max_children=max_children,
             changed_only=changed_only,
+            respect_gitignore=respect_gitignore,
         )
 
-    elif command == "summary":
+    elif args.command == "summary":
         summary_command(
             project_path,
             json_output=summary_json,
             limit=summary_limit,
+            respect_gitignore=respect_gitignore,
         )
 
-    elif command == "impact":
-        test_only = _has_flag(sys.argv, "--test-only", "-t")
-        impact_command(project_path, target, test_only=test_only)
+    elif args.command == "impact":
+        impact_command(project_path, args.function, test_only=args.test_only, respect_gitignore=respect_gitignore)
 
-    elif command == "diff":
-        json_flag = any(opt in sys.argv for opt in ["--json", "--jsonc"])
-        diff_command(project_path, json_output=json_flag)
+    elif args.command == "diff":
+        diff_command(project_path, json_output=summary_json, respect_gitignore=respect_gitignore)
 
-    elif command == "complexity":
-        complexity_command(project_path, json_output=summary_json, limit=summary_limit)
+    elif args.command == "complexity":
+        complexity_command(project_path, json_output=summary_json, limit=summary_limit, respect_gitignore=respect_gitignore)
 
-    elif command == "mermaid":
-        output = _get_flag_value(sys.argv, "--output", "-o")
-        show_changed = _has_flag(sys.argv, "--changed", "-c")
-        mermaid_command(project_path, output_file=output, show_changed=show_changed)
+    elif args.command == "mermaid":
+        mermaid_command(project_path, output_file=args.output, show_changed=args.changed, respect_gitignore=respect_gitignore)
 
-    elif command == "sarif":
-        output = _get_flag_value(sys.argv, "--output", "-o")
-        sarif_command(project_path, output_file=output)
+    elif args.command == "sarif":
+        sarif_command(project_path, output_file=args.output, respect_gitignore=respect_gitignore)
 
-    elif command == "compare":
-        base_ref = _get_flag_value(sys.argv, "--base", default="main") or "main"
-        compare_command(project_path, base_ref=base_ref, json_output=summary_json)
+    elif args.command == "compare":
+        compare_command(project_path, base_ref=args.base, json_output=summary_json, respect_gitignore=respect_gitignore)
 
-    elif command == "cycles":
-        cycles_command(project_path, json_output=summary_json)
+    elif args.command == "cycles":
+        cycles_command(project_path, json_output=summary_json, respect_gitignore=respect_gitignore)
 
-    elif command == "watch":
-        watch_command(project_path, max_depth=max_depth, max_children=max_children)
+    elif args.command == "watch":
+        watch_command(project_path, max_depth=max_depth, max_children=max_children, respect_gitignore=respect_gitignore)
 
-    elif command in ("iwatch", "incremental-watch"):
-        incremental_watch_command(project_path, max_depth=max_depth, max_children=max_children)
+    elif args.command in ("iwatch", "incremental-watch"):
+        incremental_watch_command(project_path, max_depth=max_depth, max_children=max_children, respect_gitignore=respect_gitignore)
 
-    elif command == "pre-commit":
-        threshold = _parse_int_flag(sys.argv, "--threshold", "-t", default=5)
-        exit_code = precommit_command(project_path, threshold=threshold, json_output=summary_json)
+    elif args.command == "pre-commit":
+        exit_code = precommit_command(project_path, threshold=args.threshold, json_output=summary_json, respect_gitignore=respect_gitignore)
         sys.exit(exit_code)
 
-    elif command == "predict":
-        positional_args = [a for a in sys.argv[2:] if not a.startswith("--")]
-        if not positional_args:
-            print("Usage: impact-engine predict <function>")
-            return
-        predict_command(project_path, positional_args[0], json_output=summary_json)
+    elif args.command == "predict":
+        predict_command(project_path, args.function, json_output=summary_json, respect_gitignore=respect_gitignore)
 
-    elif command == "html":
-        output = _get_flag_value(sys.argv, "--output", "-o")
-        html_command(project_path, output_file=output)
+    elif args.command == "html":
+        html_command(project_path, output_file=args.output, respect_gitignore=respect_gitignore)
 
     else:
-        print(f"Unknown command: {command}")
-        print("Commands: analyze, graph, summary, impact, diff, complexity,")
-        print("          mermaid, sarif, compare, cycles, version, watch,")
-        print("          pre-commit, predict, html, iwatch")
+        print(f"Unknown command: {args.command}")
+        parser.print_help()
 
 
 if __name__ == "__main__":

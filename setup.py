@@ -25,7 +25,6 @@ setup(
     install_requires=[
         "networkx>=3.6.1",
         "rich>=15.0.0",
-        "requests>=2.32.0",
         "pathspec>=0.12.0",
     ],
     extras_require={
@@ -34,6 +33,7 @@ setup(
             "djangorestframework>=3.14.0",
             "django-extensions>=3.2.1",
             "python-dotenv>=1.2.2",
+            "requests>=2.32.0",
         ],
         "visual": [
             "graphviz>=0.21",
