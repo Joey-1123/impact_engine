@@ -24,10 +24,12 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "networkx>=3.6.1",
-        "rich>=15.0.0",
         "pathspec>=0.12.0",
     ],
     extras_require={
+        "terminal": [
+            "rich>=15.0.0",
+        ],
         "web": [
             "Django>=5.0",
             "djangorestframework>=3.14.0",
@@ -37,7 +39,20 @@ setup(
         ],
         "visual": [
             "graphviz>=0.21",
-        ]
+        ],
+        "watch": [
+            "watchdog>=6.0.0",
+        ],
+        "full": [
+            "rich>=15.0.0",
+            "Django>=5.0",
+            "djangorestframework>=3.14.0",
+            "django-extensions>=3.2.1",
+            "python-dotenv>=1.2.2",
+            "requests>=2.32.0",
+            "graphviz>=0.21",
+            "watchdog>=6.0.0",
+        ],
     },
     entry_points={
         "console_scripts": [
