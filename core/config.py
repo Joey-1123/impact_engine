@@ -43,6 +43,8 @@ def _parse_json(file_path: str) -> dict:
 
 
 def load_config(path: str) -> Dict[str, Any]:
+    import sys as _sys
+
     config_path = _find_config(path)
     if not config_path:
         return {}
@@ -52,6 +54,9 @@ def load_config(path: str) -> Dict[str, Any]:
         raw = _parse_toml(config_path)
     else:
         raw = _parse_json(config_path)
+
+    if not raw:
+        print(f"Warning: config file {config_path} exists but could not be parsed", file=_sys.stderr)
 
     section = raw.get("impact-engine", raw)
 
