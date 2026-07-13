@@ -14,6 +14,9 @@ from core.health.biomarkers.structural import (
     detect_complex_conditional,
     detect_low_cohesion,
     detect_bumpy_road,
+    detect_large_class,
+    detect_dry_violation,
+    detect_error_handling,
 )
 from core.health.biomarkers.performance import (
     detect_io_in_loop,
@@ -44,6 +47,9 @@ _BIOMARKER_FNS: list[Any] = [
     detect_complex_conditional,
     detect_low_cohesion,
     detect_bumpy_road,
+    detect_large_class,
+    detect_dry_violation,
+    detect_error_handling,
     detect_io_in_loop,
     detect_string_concat_in_loop,
     detect_blocking_sync_in_async,

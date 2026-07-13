@@ -219,3 +219,61 @@ def detect_bumpy_road(ctx: FileContext) -> list[BiomarkerResult]:
             reason=f"High churn ({changelog}) + high complexity ({ccn})",
         ))
     return results
+
+
+def detect_large_class(ctx: FileContext) -> list[BiomarkerResult]:
+    results: list[BiomarkerResult] = []
+    tree = _parse_python(ctx.file_path)
+    if tree is None:
+        return results
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            methods = [n for n in ast.walk(node) if isinstance(n, ast.FunctionDef)]
+            fields = [n for n in ast.walk(node) if isinstance(n, ast.Assign)]
+            nloc = (node.end_lineno or node.lineno) - node.lineno
+            if nloc > 400 or len(methods) > 25:
+                results.append(BiomarkerResult(
+                    biomarker_type="large_class",
+                    severity=Severity.HIGH,
+                    function_name=node.name,
+                    line_start=node.lineno,
+                    line_end=node.end_lineno or node.lineno,
+                    details={"nloc": nloc, "methods": len(methods), "fields": len(fields)},
+                    reason=f"Large class: {nloc} LOC, {len(methods)} methods",
+                ))
+    return results
+
+
+def detect_dry_violation(ctx: FileContext) -> list[BiomarkerResult]:
+    results: list[BiomarkerResult] = []
+    if ctx.duplication_pct is not None and ctx.duplication_pct > 0.2:
+        results.append(BiomarkerResult(
+            biomarker_type="dry_violation",
+            severity=Severity.MEDIUM,
+            details={"duplication_pct": ctx.duplication_pct, "clone_count": len(ctx.clones)},
+            reason=f"DRY violation: {ctx.duplication_pct:.0%} duplicated",
+        ))
+    return results
+
+
+def detect_error_handling(ctx: FileContext) -> list[BiomarkerResult]:
+    results: list[BiomarkerResult] = []
+    tree = _parse_python(ctx.file_path)
+    if tree is None:
+        return results
+    bare_excepts = 0
+    total_functions = 0
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            total_functions += 1
+            for child in ast.walk(node):
+                if isinstance(child, ast.ExceptHandler) and child.type is None:
+                    bare_excepts += 1
+    if bare_excepts > 2:
+        results.append(BiomarkerResult(
+            biomarker_type="error_handling",
+            severity=Severity.MEDIUM,
+            details={"bare_excepts": bare_excepts, "total_functions": total_functions},
+            reason=f"Bare except: {bare_excepts} handlers without exception type",
+        ))
+    return results
