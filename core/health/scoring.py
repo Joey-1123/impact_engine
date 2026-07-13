@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
-from .biomarkers import BiomarkerResult
+from .biomarkers._models import BiomarkerResult
 from .models import HealthFileMetricData, HealthFindingData, Severity
 
 CATEGORY_CAPS: dict[str, float] = {
