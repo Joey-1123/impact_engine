@@ -1,8 +1,20 @@
 <div align="center">
 
-<a href="https://github.com/Joey-1123/impact_engine"><img src=".github/assets/banner.svg" alt="Impact Engine: codebase intelligence platform" width="100%" /></a>
+<pre style="background:#0a0a0a; color:#e2e8f0; font-family:monospace; font-size:11px; line-height:1.2; padding:24px; border-radius:12px; border:1px solid #1e293b; display:inline-block; text-align:left;">
+██▓ ███▄ ▄███▓ ██▓███   ▄▄▄       ▄████▄  ▄▄▄█████▓    ███▄    █  ███▄    █  ▄████  ██▓ ███▄    █ ▓█████
+▓██▒▓██▒▀█▀ ██▒▓██░  ██▒▒████▄    ▒██▀ ▀█  ▓  ██▒ ▓▒    ██ ▀█   █  ██ ▀█   █ ██▒ ▀█▒▓██▒ ██ ▀█   █ ▓█   ▀
+▒██▒▓██    ▓██░▓██░ ██▓▒▒██  ▀█▄  ▒▓█    ▄ ▒ ▓██░ ▒░   ▓██  ▀█ ██▒▓██  ▀█ ██▒▒██░▄▄▄░▒██▒▓██  ▀█ ██▒▒███
+░██░▒██    ▒██ ▒██▄█▓▒ ▒░██▄▄▄▄██ ▒▓▓▄ ▄██▒░ ▓██▓ ░    ▓██▒  ▐▌██▒▓██▒  ▐▌██▒░▓█  ██▓░██░▓██▒  ▐▌██▒▒▓█  ▄
+░██░▒██▒   ░██▒▒██▒ ░  ░ ▓█   ▓██▒▒ ▓███▀ ░  ▒██▒ ░    ▒██░   ▓██░▒██░   ▓██░░▒▓███▀▒░██░▒██░   ▓██░░▒████▒
+░▓  ░ ▒░   ░  ░▒▓▒░ ░  ░ ▒▒   ▓▒█░░ ░▒ ▒  ░   ▒ ░░      ░ ▒░   ▒ ▒ ░ ▒░   ▒ ▒  ░▒   ▒ ░▓  ░ ▒░   ▒ ▒ ░░ ▒░ ░
+ ▒ ░░  ░      ░░▒ ░       ▒   ▒▒ ░  ░  ▒        ░       ░ ░░   ░ ▒░░ ░░   ░ ▒░  ░   ░  ▒ ░░ ░░   ░ ▒░░ ░  ░
+ ▒ ░░      ░   ░░         ░   ▒   ░           ░            ░   ░ ░    ░   ░ ░ ░ ░   ░  ▒ ░   ░   ░ ░   ░
+ ░               ░            ░  ░░ ░                        ░              ░       ░  ░           ░   ░  ░
+                             ░                                                                             
 
-<p align="center"><strong>Dependency graph · Health scoring · Knowledge graph · MCP for AI agents · REST API · Web dashboard · One <code>pip install</code></strong></p>
+<strong style="color:#6366f1;">Codebase intelligence platform</strong>
+Dependency analysis · Health scoring · Knowledge graphs · REST API · Web dashboard · MCP for AI agents
+</pre>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-059669?style=for-the-badge&labelColor=0A0A0A" alt="License: MIT" /></a>
