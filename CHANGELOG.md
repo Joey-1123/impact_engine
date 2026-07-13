@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.7.0
+- **Health Scoring Engine** — 3D health score (defect, maintainability, performance) with 26 biomarker detectors across structural, performance, and organizational dimensions
+- **Knowledge Graph** — PageRank centrality, community detection (greedy modularity), layer inference, entry-point tours
+- **Duplication Detection** — Rabin-Karp rolling hash clone detection with per-file duplication percentage
+- **Decision Mining** — Extract design decisions from git log, ADR files, and changelogs
+- **Cost Estimator** — Heuristic token costing per page type across 7 LLM models
+- **FastAPI Server** — 7 routers (health, overview, graph, health-score, costs, decisions, workspace) with cached async analysis
+- **Web UI** — Next.js 15 App Router with 4 pages (dashboard, overview, graph, decisions)
+- **MCP Server** — FastMCP with 4 tools (get_overview, get_health, get_graph, list_tools)
+- **LLM Providers** — OpenAI, Anthropic, Gemini async providers with embedder and extensible registry
+- **Vector Store** — ABC with InMemory and LanceDB backends, cosine similarity search
+- **CLI** — 7 new commands: health, kg, decisions, cost, duplication, serve, mcp; all with `--json` output
+- **Refactoring Detectors** — Extract class, extract method, break cycle, move method, split file
+- **Blame Index** — Function-level git blame with code age, churn, and ownership signals
+- **Dead Code Confidence** — Risk-factor scoring for dead-code deletion safety
+- **PR Blast Radius** — Extend traversal with risk-scored impact propagation
+- **Contributor Profiles** — Ownership risk, developer congestion, knowledge loss detection
+
 ## v0.6.0
 - **argparse CLI** — Migrated from hand-rolled flag parsing to `argparse` subparsers with help for every command
 - **Weighted risk model** — Risk score = impact count + `max(0, complexity - 1)` bonus
