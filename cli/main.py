@@ -570,6 +570,29 @@ def main():
     p_html = sub.add_parser("html", help="Interactive D3.js HTML report")
     p_html.add_argument("--output", "-o", help="Output file")
 
+    p_health = sub.add_parser("health", help="3D health score (defect/maintainability/performance)")
+    p_health.add_argument("--json", action="store_true", dest="json_output")
+
+    p_kg = sub.add_parser("knowledge-graph", aliases=["kg"], help="Knowledge graph skeleton")
+
+    p_decisions = sub.add_parser("decisions", help="Mine design decisions")
+    p_decisions.add_argument("--source", default="pr", choices=["pr", "adr", "changelog"], help="Decision source type")
+
+    p_cost = sub.add_parser("cost", help="Estimate LLM generation cost")
+    p_cost.add_argument("--types", default="file_summary,tour_step", help="Page types (comma-separated)")
+    p_cost.add_argument("--count", type=int, default=10, help="Number of items")
+    p_cost.add_argument("--model", default="claude-sonnet-4-6", help="Model name")
+
+    p_duplication = sub.add_parser("duplication", help="Detect code clones via rolling hash")
+    p_duplication.add_argument("--window", type=int, default=50, help="Token window size")
+
+    p_server = sub.add_parser("serve", help="Start FastAPI server")
+    p_server.add_argument("--port", type=int, default=8000, help="Server port")
+    p_server.add_argument("--host", default="127.0.0.1", help="Bind address")
+
+    p_mcp = sub.add_parser("mcp", help="Start MCP server")
+    p_mcp.add_argument("--port", type=int, default=8001, help="MCP server port")
+
     sub.add_parser("version", help="Print version and exit")
     sub.add_parser("help", help="Print this help message")
 
@@ -661,6 +684,34 @@ def main():
 
     elif args.command == "html":
         html_command(project_path, output_file=args.output, respect_gitignore=respect_gitignore)
+
+    elif args.command == "health":
+        from cli.new_commands import health_command as _h
+        _h(project_path, json_output=summary_json)
+
+    elif args.command in ("knowledge-graph", "kg"):
+        from cli.new_commands import knowledge_graph_command as _k
+        _k(project_path)
+
+    elif args.command == "decisions":
+        from cli.new_commands import decisions_command as _d
+        _d(project_path, source=args.source)
+
+    elif args.command == "cost":
+        from cli.new_commands import cost_command as _c
+        _c(args.types, args.count, args.model)
+
+    elif args.command == "duplication":
+        from cli.new_commands import duplication_command as _dup
+        _dup(project_path, window=args.window)
+
+    elif args.command == "serve":
+        from cli.new_commands import serve_command as _s
+        _s(args.host, args.port)
+
+    elif args.command == "mcp":
+        from cli.new_commands import mcp_command as _m
+        _m(args.port)
 
     else:
         print(f"Unknown command: {args.command}")
