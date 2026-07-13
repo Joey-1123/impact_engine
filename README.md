@@ -1,12 +1,7 @@
 <div align="center">
 
-<pre style="background:#0f172a; color:#e2e8f0; font-family:monospace; font-size:13px; line-height:1.3; padding:16px 24px; border-radius:8px; border:1px solid #334155; display:inline-block;">
-  _ __ ___   __ _  ___ _ __ ___    __ _  __ _ _ __  ___  ___
- | '_ ` _ \ / _` |/ _ \ '__/ __|  / _` |/ _` | '_ \/ __|/ _ \
- | | | | | | (_| |  __/ |  \__ \ | (_| | (_| | | | \__ \  __/
- |_| |_| |_|\__,_|\___|_|  |___/  \__, |\__,_|_| |_|___/\___|
-                                   |___/
-</pre>
+<img alt="Impact Engine" src=".github/assets/banner.svg" width="600">
+
 
 <p><strong>Static code analysis pipeline with health scoring, knowledge graphs, and AI agent tooling</strong></p>
 
