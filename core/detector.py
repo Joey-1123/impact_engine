@@ -1,5 +1,5 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
-from typing import List, Set, Dict, Any, Optional
+from typing import List, Set, Optional
 import networkx as nx
 
 
@@ -35,21 +35,3 @@ def find_entry_points(
 
     return entry_points
 
-
-def build_impact_report(
-    graph: nx.DiGraph,
-    entry_points: Optional[List[str]] = None,
-    main_block_functions: Optional[Set[str]] = None,
-) -> Dict[str, Any]:
-    if entry_points is None:
-        entry_points = find_entry_points(graph, main_block_functions=main_block_functions)
-
-    cycles = find_cycles(graph)
-
-    return {
-        "cycles": cycles,
-        "cycle_count": len(cycles),
-        "entry_points": entry_points,
-        "node_count": graph.number_of_nodes(),
-        "edge_count": graph.number_of_edges(),
-    }

@@ -10,6 +10,9 @@ __pycache__/
 venv/
 .venv/
 
+# Vendored dependencies (not project code)
+path/
+
 # VS Code
 .vscode/
 
@@ -38,6 +41,9 @@ build/
 # Database
 *.sqlite3
 db.sqlite3
+
+# Vendored dependencies (not project code)
+path/
 
 # Environment
 .env
