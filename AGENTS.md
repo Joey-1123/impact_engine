@@ -8,16 +8,17 @@
 
 | Path | Role |
 |---|---|
-| **`cli/`** | Argparse entry point (`main.py`) — 25+ commands, thin dispatch layer |
-| **`core/`** | All analysis logic — graph building, health scoring, knowledge graph, extraction |
-| **`core/health/`** | Scoring engine + 26 biomarker detectors (structural, performance, organizational) |
-| **`core/graph/`** | Knowledge graph construction, PageRank, community detection, layer inference |
-| **`core/parsers/`** | Language-specific parsers (Python, JS/TS, Go, Rust, Java) |
-| **`core/providers/`** | LLM providers (OpenAI, Anthropic, Gemini) + embedding providers |
-| **`core/persistence/`** | Vector store (InMemory, LanceDB) |
-| **`core/pipeline/`** | Orchestrator with phased execution (ingestion → analysis → generation) |
-| **`server/`** | FastAPI REST API + MCP server for AI agents |
-| **`impact_web/`** | Django web dashboard |
+| **`cli/`** | Argparse entry point (`main.py`, `new_commands.py`) — 25+ commands, thin dispatch layer |
+| **`core/`** | All analysis logic — extraction, graph building, health scoring, knowledge graph |
+| **`core/health/`** | Scoring engine + 26 biomarker detectors across three categories |
+| **`core/health/biomarkers/`** | Detector functions: `structural.py` (12), `performance.py` (3), `organizational.py` (11) |
+| **`core/graph/`** | Knowledge graph construction (`kg.py`) — PageRank, community detection, layer inference |
+| **`core/parsers/`** | Language-specific parsers: `python_parser.py`, `js_parser.py`, `go_parser.py`, `rust_parser.py`, `java_parser.py` |
+| **`core/providers/`** | LLM providers (`openai.py`, `anthropic.py`, `gemini.py`) + embedding providers |
+| **`core/persistence/`** | Vector store: `memory.py` (InMemory), `lancedb.py` (LanceDB) |
+| **`core/pipeline/`** | Orchestrator with phased execution: `ingestion.py` → `analysis.py` → `generation.py` |
+| **`server/`** | FastAPI REST API (9 routers) + MCP server (4 tools) for AI agents |
+| **`impact_web/`** | Django web dashboard (legacy) |
 | **`web/`** | Next.js 15 frontend dashboard |
 | **`tests/`** | Unit tests (unittest + pytest) |
 
@@ -28,8 +29,8 @@ Commands assume **repo root**.
 ## Runtime scope
 
 - **CLI tool**: `impact-engine -p /path/to/project <command>` — primary interface.
-- **REST API**: `impact-engine -p /path/to/project serve --port 8000` — FastAPI with 7 endpoint groups.
-- **MCP server**: `impact-engine -p /path/to/project mcp --port 8001` — 9 tools for AI coding agents.
+- **REST API**: `impact-engine -p /path/to/project serve --port 8000` — FastAPI with 9 endpoint groups.
+- **MCP server**: `impact-engine -p /path/to/project mcp --port 8001` — 4 tools for AI coding agents.
 - **Web dashboard**: Next.js app at `web/` — graph explorer, health view, decision viewer.
 
 **Where logic lives:**
@@ -168,8 +169,8 @@ The pipeline runs in under 30 seconds on a 3,000-file repository and caches resu
 
 ### Adding a new MCP tool
 
-1. Add tool function in `server/mcp_tools.py`.
-2. Register with `@mcp_tool` decorator.
+1. Add tool function in `server/mcp_server.py`.
+2. Register with `@mcp_tool_registry.register()` decorator.
 3. Add tests.
 4. Update README.md MCP tools table.
 

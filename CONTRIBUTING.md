@@ -148,8 +148,8 @@ git checkout -b feat/my-change
 
 ### Adding a new MCP tool
 
-1. Add tool function in `server/mcp_tools.py`.
-2. Register with `@mcp_tool` decorator.
+1. Add tool function in `server/mcp_server.py`.
+2. Register with `@mcp_tool_registry.register()` decorator.
 3. Add tests.
 4. Update README.md MCP tools table.
 

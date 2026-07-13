@@ -27,9 +27,9 @@ Impact Engine is a Python-based static analysis framework that builds a function
 | **Knowledge graph** | PageRank centrality, greedy modularity communities, architectural layer inference, entry-point tours |
 | **Clone detection** | Rabin-Karp rolling hash, token-normalized, feeds duplication % into health scores |
 | **Decision mining** | Extract design decisions from git log, ADRs, and changelogs with confidence scoring |
-| **REST API** | FastAPI server with 7 endpoint groups, cached async analysis, CORS-enabled |
+| **REST API** | FastAPI server with 9 endpoint groups, cached async analysis, CORS-enabled |
 | **Web dashboard** | Next.js 15 app with graph explorer, health view, decision viewer |
-| **MCP server** | 9 tools for AI coding agents (Claude Code, Codex, Cursor) |
+| **MCP server** | 4 tools for AI coding agents (Claude Code, Codex, Cursor) |
 
 ---
 
@@ -215,11 +215,6 @@ Protocol. Add to your agent's config:
 | `get_overview()` | Repo structure, layers, entry points |
 | `get_health()` | Health scores, biomarker findings, refactoring targets |
 | `get_graph()` | Knowledge graph nodes and edges |
-| `get_dead_code()` | Unreachable code by confidence tier |
-| `get_decisions()` | Architectural decision records |
-| `get_duplication()` | Clone pairs across the codebase |
-| `get_cost_estimate()` | LLM generation cost by page type and model |
-| `get_findings()` | Biomarker results filtered by category or severity |
 | `list_tools()` | Discover available tools |
 
 ---
