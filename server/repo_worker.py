@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from core.extractor import extract_project_dependencies_rich
+from core.parsers import list_supported_extensions
 from core.graph_builder import build_graph
 from core.detector import find_entry_points, find_cycles
 from core.analyzer import find_dead_code

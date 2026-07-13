@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from server import __version__
-from server.routers import health, overview, graph, health_score, costs, decisions, workspace
+from server.routers import health, overview, graph, health_score, costs, decisions, workspace, impact, webhook
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,8 @@ def create_app(repo_path: str | None = None) -> FastAPI:
     app.include_router(costs.router)
     app.include_router(decisions.router)
     app.include_router(workspace.router)
+    app.include_router(impact.router)
+    app.include_router(webhook.router)
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):

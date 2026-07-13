@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Shubham Panchal (Joey). MIT License.
 import os
-from typing import List, Optional
+from typing import List, Optional, Set
 
 try:
     import pathspec
@@ -22,7 +22,15 @@ def _load_gitignore(base_dir: str) -> Optional[object]:
 
 
 def get_python_files(base_dir: str, respect_gitignore: bool = True) -> List[str]:
-    python_files: List[str] = []
+    return get_code_files(base_dir, {".py"}, respect_gitignore=respect_gitignore)
+
+
+def get_code_files(base_dir: str, extensions: Set[str] | None = None, respect_gitignore: bool = True) -> List[str]:
+    if extensions is None:
+        from core.parsers import list_supported_extensions
+        extensions = set(list_supported_extensions())
+
+    code_files: List[str] = []
 
     ignore_dirs = {".venv", "venv", "env", ".git", "__pycache__", "node_modules", "build", "dist"}
 
@@ -42,11 +50,13 @@ def get_python_files(base_dir: str, respect_gitignore: bool = True) -> List[str]
             ]
 
         for file in files:
-            if file.endswith(".py"):
-                file_path = os.path.join(root, file)
-                rel_path = os.path.join(rel_root, file) if rel_root else file
-                if spec and spec.match_file(rel_path):
-                    continue
-                python_files.append(file_path)
+            ext = os.path.splitext(file)[1].lower()
+            if ext not in extensions:
+                continue
+            file_path = os.path.join(root, file)
+            rel_path = os.path.join(rel_root, file) if rel_root else file
+            if spec and spec.match_file(rel_path):
+                continue
+            code_files.append(file_path)
 
-    return python_files
+    return code_files

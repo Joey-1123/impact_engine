@@ -83,21 +83,21 @@ impact-engine -p /path/to/your/project mcp --port 8001
 | `impact <func>` | What breaks if a function changes |
 | `diff` | Current working tree changes |
 | `complexity` | Cyclomatic complexity ranking |
-| `health` | 3D health score (23 biomarkers) |
-| `kg` | Knowledge graph with layers |
-| `decisions` | Mine design decisions from git log |
+| `health` | 3D health score (26 biomarkers, zero LLM) |
+| `kg` | Knowledge graph with layers, PageRank, communities |
+| `decisions` | Mine design decisions from git log, ADRs, changelogs |
 | `cost` | Estimate LLM generation cost |
-| `duplication` | Detect code clones |
+| `duplication` | Detect code clones (Rabin-Karp rolling hash) |
 | `cycles` | Find circular dependencies |
 | `mermaid` | Export Mermaid.js diagram |
 | `sarif` | Export SARIF (GitHub code scanning) |
 | `html` | Interactive D3.js HTML report |
-| `serve` | Start FastAPI server |
-| `mcp` | Start MCP server |
+| `serve` | Start FastAPI server (REST API + webhook) |
+| `mcp` | Start MCP server for AI agents |
 | `compare` | Risk delta between branches |
 | `pre-commit` | Check staged files against risk threshold |
-| `predict` | What-if analysis |
-| `watch` / `iwatch` | File watching mode |
+| `predict` | What-if simulation (no git needed) |
+| `watch` / `iwatch` | File watching (full / incremental) |
 
 ## 5. Configuration
 
@@ -125,8 +125,13 @@ impact-engine -p /path/to/project serve --host 127.0.0.1 --port 8000
 # GET  /api/repos/{id}/overview
 # GET  /api/repos/{id}/graph
 # GET  /api/repos/{id}/health-score
+# GET  /api/repos/{id}/findings
 # GET  /api/repos/{id}/costs
 # GET  /api/repos/{id}/decisions
+# GET  /api/repos/{id}/impact?function=<name>
+# GET  /api/repos/{id}/timeline
+# GET  /api/repos/{id}/report
+# POST /webhook/github
 # GET  /workspace
 # GET  /workspace/graph
 # GET  /workspace/conformance

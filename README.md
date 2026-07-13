@@ -170,7 +170,7 @@ impact-engine -p /path/to/project serve --port 8000
 ```
 
 | Endpoint | Returns |
-|---|---|
+|---|---|---|
 | `GET /health` | Service status + version |
 | `GET /api/repos/{id}/overview` | File counts, language distribution, layers |
 | `GET /api/repos/{id}/graph` | Knowledge graph nodes, edges, communities |
@@ -178,6 +178,10 @@ impact-engine -p /path/to/project serve --port 8000
 | `GET /api/repos/{id}/findings` | Filtered biomarker results |
 | `GET /api/repos/{id}/decisions` | Mined architectural decisions |
 | `GET /api/repos/{id}/costs` | LLM generation cost estimates |
+| `GET /api/repos/{id}/impact` | Impact analysis for a given function |
+| `GET /api/repos/{id}/timeline` | Git timeline with before/after changes |
+| `GET /api/repos/{id}/report` | PR-style impact report |
+| `POST /webhook/github` | GitHub webhook receiver (HMAC-verified) |
 
 ---
 

@@ -316,8 +316,18 @@ def extract_dependencies(file_path: str, base_dir: str) -> Tuple[Dict[str, List[
     return deps, extractor.main_block_functions, extractor.function_linenos, extractor.function_complexity
 
 
-def extract_project_dependencies(path: str, respect_gitignore: bool = True) -> Dict[str, List[str]]:
-    from core.file_loader import get_python_files
+def _parse_single_file(file: str, base_dir: str) -> Dict[str, List[str]]:
+    """Parse a single file using the appropriate parser for its extension."""
+    from core.parsers import get_parser
+    ParserCls = get_parser(file)
+    if ParserCls is not None:
+        parser = ParserCls()
+        return parser.extract_dependencies(file, base_dir)
+    return {}
+
+
+def extract_project_dependencies(path: str, respect_gitignore: bool = True, all_languages: bool = True) -> Dict[str, List[str]]:
+    from core.file_loader import get_code_files
 
     all_dependencies: Dict[str, Set[str]] = {}
 
@@ -325,12 +335,15 @@ def extract_project_dependencies(path: str, respect_gitignore: bool = True) -> D
         files = [path]
         base_dir = os.path.dirname(path) or "."
     else:
-        files = get_python_files(path, respect_gitignore=respect_gitignore)
+        files = get_code_files(path, respect_gitignore=respect_gitignore) if all_languages else get_code_files(path, {".py"}, respect_gitignore=respect_gitignore)
         base_dir = path
 
     for file in files:
         try:
-            deps, _, _, _ = extract_dependencies(file, base_dir)
+            if file.endswith(".py"):
+                deps, _, _, _ = extract_dependencies(file, base_dir)
+            else:
+                deps = _parse_single_file(file, base_dir)
 
             for func, calls in deps.items():
                 if func not in all_dependencies:
@@ -343,8 +356,8 @@ def extract_project_dependencies(path: str, respect_gitignore: bool = True) -> D
     return {k: list(v) for k, v in all_dependencies.items()}
 
 
-def extract_project_dependencies_rich(path: str, respect_gitignore: bool = True) -> Tuple[Dict[str, List[str]], Dict[str, int], Dict[str, int]]:
-    from core.file_loader import get_python_files
+def extract_project_dependencies_rich(path: str, respect_gitignore: bool = True, all_languages: bool = True) -> Tuple[Dict[str, List[str]], Dict[str, int], Dict[str, int]]:
+    from core.file_loader import get_code_files
 
     all_dependencies: Dict[str, Set[str]] = {}
     all_linenos: Dict[str, int] = {}
@@ -354,20 +367,22 @@ def extract_project_dependencies_rich(path: str, respect_gitignore: bool = True)
         files = [path]
         base_dir = os.path.dirname(path) or "."
     else:
-        files = get_python_files(path, respect_gitignore=respect_gitignore)
+        files = get_code_files(path, respect_gitignore=respect_gitignore) if all_languages else get_code_files(path, {".py"}, respect_gitignore=respect_gitignore)
         base_dir = path
 
     for file in files:
         try:
-            deps, _, linenos, complexities = extract_dependencies(file, base_dir)
+            if file.endswith(".py"):
+                deps, _, linenos, complexities = extract_dependencies(file, base_dir)
+                all_linenos.update(linenos)
+                all_complexities.update(complexities)
+            else:
+                deps = _parse_single_file(file, base_dir)
 
             for func, calls in deps.items():
                 if func not in all_dependencies:
                     all_dependencies[func] = set()
                 all_dependencies[func].update(calls)
-
-            all_linenos.update(linenos)
-            all_complexities.update(complexities)
 
         except Exception as e:
             print(f"Error parsing {file}: {e}", file=sys.stderr)
