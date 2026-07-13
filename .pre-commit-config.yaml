@@ -17,9 +17,9 @@ repos:
 
   - repo: local
     hooks:
-      - id: no-repowise
-        name: No repowise references in staged files
-        entry: bash -c 'STAGED=$(git diff --cached --name-only --diff-filter=ACM) && [ -z "$STAGED" ] || ! echo "$STAGED" | xargs grep -l repowise 2>/dev/null'
+      - id: no-third-party-names
+        name: No third-party project name references in staged files
+        entry: bash -c 'STAGED=$(git diff --cached --name-only --diff-filter=ACM) && [ -z "$STAGED" ] || ! echo "$STAGED" | xargs grep -l -i "repowi[se]" 2>/dev/null'
         language: system
         pass_filenames: false
         stages: [pre-commit]
