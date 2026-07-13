@@ -1,4 +1,9 @@
-networkx==3.6.1
-rich==15.0.0
-requests==2.32.4
+# Runtime dependencies (install via setup.py or pip install -e .)
+networkx>=3.6.1
 pathspec>=0.12.0
+
+# Optional extras
+# rich>=15.0.0          # terminal formatting (install: pip install -e ".[terminal]")
+# fastapi uvicorn        # REST server (install: pip install -e ".[web]")
+# mcp                    # MCP server (install: pip install -e ".[mcp]")
+# lancedb openai anthropic google-genai  # full AI features
