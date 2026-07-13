@@ -22,12 +22,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Impact Engine server shutting down")
 
 
-def create_app() -> FastAPI:
+def create_app(repo_path: str | None = None) -> FastAPI:
     app = FastAPI(
         title="Impact Engine",
         version=__version__,
         lifespan=lifespan,
     )
+
+    app.state.repo_path = repo_path
 
     app.add_middleware(
         CORSMiddleware,

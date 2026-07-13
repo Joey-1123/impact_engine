@@ -4,7 +4,14 @@ import json
 import os
 from pathlib import Path
 
-from core.health import score_file, compute_kpis
+from core.health import (
+    HealthFileMetricData,
+    Severity,
+    attach_impacts,
+    compute_kpis,
+    score_file,
+)
+from core.health.biomarkers import BiomarkerResult
 
 
 def _run_analysis(project_path: str) -> tuple:
@@ -27,34 +34,86 @@ def _run_analysis(project_path: str) -> tuple:
 def health_command(project_path: str, json_output: bool = False) -> None:
     deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path)
     findings: list = []
+    metrics: list = []
     for node in graph.nodes():
+        func_results: list[BiomarkerResult] = []
         fpath = node.split("::")[0] if "::" in node else node
-        score_file(fpath, complexities.get(node, 1), len(list(graph.successors(node))), findings)
-    kpis = compute_kpis([], findings)
+        ccn = complexities.get(node, 1)
+        if ccn > 10:
+            func_results.append(
+                BiomarkerResult(
+                    biomarker_type="complex_method",
+                    severity=Severity.HIGH,
+                    function_name=node,
+                    details={"cyclomatic_complexity": ccn},
+                )
+            )
+        if ccn > 20:
+            func_results.append(
+                BiomarkerResult(
+                    biomarker_type="brain_method",
+                    severity=Severity.CRITICAL,
+                    function_name=node,
+                    details={"cyclomatic_complexity": ccn},
+                )
+            )
+        if func_results:
+            scores, deductions = score_file(func_results)
+            impacted = attach_impacts(func_results, deductions)
+            findings.extend(impacted)
+        else:
+            scores = {"defect": 10.0, "maintainability": 10.0, "performance": 10.0}
+        metrics.append(
+            HealthFileMetricData(
+                file_path=fpath,
+                score=scores.get("defect", 10.0) or 10.0,
+                max_ccn=ccn,
+                max_nesting=0,
+                nloc=ccn * 10,
+                defect_score=scores.get("defect"),
+                maintainability_score=scores.get("maintainability"),
+                performance_score=scores.get("performance"),
+            )
+        )
+    hotspot_paths = {m.file_path for m in metrics if m.score < 7.0}
+    kpis = compute_kpis(metrics, hotspot_paths)
     if json_output:
         print(json.dumps({"findings": len(findings), "kpis": kpis}, indent=2))
     else:
         print(f"Findings: {len(findings)}")
+        print(f"Files analyzed: {len(metrics)}")
         for k, v in kpis.items():
-            print(f"  {k}: {v:.2f}")
+            if isinstance(v, float):
+                print(f"  {k}: {v:.2f}")
+            else:
+                print(f"  {k}: {v}")
 
 
-def knowledge_graph_command(project_path: str) -> None:
-    from cli.main import _run_analysis
+def knowledge_graph_command(project_path: str, json_output: bool = False) -> None:
     from core.graph.kg import build_knowledge_graph_skeleton
 
     deps, graph, changed_funcs, entry_points, dead_nodes, cycles, linenos, complexities = _run_analysis(project_path)
     kg = build_knowledge_graph_skeleton(graph, complexities=complexities, entry_points=list(entry_points)[:5])
-    print(f"Knowledge Graph: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
-    print(f"Layers: {kg.layers}")
-    print(f"Fingerprint: {kg.fingerprint}")
-    if kg.tour:
-        print("Tour:")
-        for step in kg.tour:
-            print(f"  {step['title']} -> {step['target']}")
+    if json_output:
+        import json as _json
+        print(_json.dumps({
+            "nodes": len(kg.nodes),
+            "edges": len(kg.edges),
+            "layers": kg.layers,
+            "fingerprint": kg.fingerprint,
+            "tour": kg.tour,
+        }, indent=2))
+    else:
+        print(f"Knowledge Graph: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
+        print(f"Layers: {kg.layers}")
+        print(f"Fingerprint: {kg.fingerprint}")
+        if kg.tour:
+            print("Tour:")
+            for step in kg.tour:
+                print(f"  {step['title']} -> {step['target']}")
 
 
-def decisions_command(project_path: str, source: str = "pr") -> None:
+def decisions_command(project_path: str, source: str = "pr", json_output: bool = False) -> None:
     from core.decisions import extract_pr_decisions, extract_adrs, mine_changelog_decisions
 
     all_decisions = []
@@ -73,9 +132,25 @@ def decisions_command(project_path: str, source: str = "pr") -> None:
             if cl_path.exists():
                 all_decisions = mine_changelog_decisions(cl_path)
                 break
-    print(f"Decisions: {len(all_decisions)}")
-    for d in all_decisions[:10]:
-        print(f"  [{d.status}] {d.title} (conf={d.confidence:.2f})")
+    if json_output:
+        import json as _json
+        print(_json.dumps({
+            "total": len(all_decisions),
+            "decisions": [
+                {
+                    "title": d.title,
+                    "status": d.status,
+                    "confidence": d.confidence,
+                    "source": d.source,
+                    "rationale": d.rationale,
+                }
+                for d in all_decisions
+            ],
+        }, indent=2))
+    else:
+        print(f"Decisions: {len(all_decisions)}")
+        for d in all_decisions[:10]:
+            print(f"  [{d.status}] {d.title} (conf={d.confidence:.2f})")
 
 
 def cost_command(types_str: str, count: int, model: str) -> None:
@@ -89,7 +164,7 @@ def cost_command(types_str: str, count: int, model: str) -> None:
     print(f"Estimated cost: ${est.estimated_cost_usd:.4f}")
 
 
-def duplication_command(project_path: str, window: int = 50) -> None:
+def duplication_command(project_path: str, window: int = 50, json_output: bool = False) -> None:
     from core.health.duplication import find_clones
 
     file_sources: dict[str, str] = {}
@@ -98,17 +173,36 @@ def duplication_command(project_path: str, window: int = 50) -> None:
             continue
         file_sources[str(f)] = f.read_text(encoding="utf-8")
     report = find_clones(file_sources, window=window)
-    print(f"Clone pairs: {report.total_clones}")
-    print(f"Duplicated lines: {report.duplicated_lines}")
-    for p in report.pairs[:10]:
-        print(f"  {p.file_a}:{p.start_a} <-> {p.file_b}:{p.start_b}  len={p.length}  sim={p.similarity:.2f}")
+    if json_output:
+        import json as _json
+        pairs = [
+            {
+                "file_a": p.file_a,
+                "file_b": p.file_b,
+                "start_a": p.start_a,
+                "start_b": p.start_b,
+                "length": p.length,
+                "similarity": p.similarity,
+            }
+            for p in report.pairs[:50]
+        ]
+        print(_json.dumps({
+            "total_clones": report.total_clones,
+            "duplicated_lines": report.duplicated_lines,
+            "pairs": pairs,
+        }, indent=2))
+    else:
+        print(f"Clone pairs: {report.total_clones}")
+        print(f"Duplicated lines: {report.duplicated_lines}")
+        for p in report.pairs[:10]:
+            print(f"  {p.file_a}:{p.start_a} <-> {p.file_b}:{p.start_b}  len={p.length}  sim={p.similarity:.2f}")
 
 
-def serve_command(host: str, port: int) -> None:
+def serve_command(host: str, port: int, project_path: str = "") -> None:
     import uvicorn
     from server.app import create_app
 
-    app = create_app()
+    app = create_app(repo_path=project_path)
     print(f"Starting Impact Engine server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
 
@@ -118,5 +212,6 @@ def mcp_command(port: int) -> None:
     from server.mcp_server import create_mcp_server
 
     mcp = create_mcp_server()
+    app = mcp.sse_app()
     print(f"Starting MCP server on port {port}")
-    mcp.run(port=port)
+    uvicorn.run(app, host="127.0.0.1", port=port)

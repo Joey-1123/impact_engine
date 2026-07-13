@@ -574,9 +574,11 @@ def main():
     p_health.add_argument("--json", action="store_true", dest="json_output")
 
     p_kg = sub.add_parser("knowledge-graph", aliases=["kg"], help="Knowledge graph skeleton")
+    p_kg.add_argument("--json", action="store_true", dest="json_output")
 
     p_decisions = sub.add_parser("decisions", help="Mine design decisions")
     p_decisions.add_argument("--source", default="pr", choices=["pr", "adr", "changelog"], help="Decision source type")
+    p_decisions.add_argument("--json", action="store_true", dest="json_output")
 
     p_cost = sub.add_parser("cost", help="Estimate LLM generation cost")
     p_cost.add_argument("--types", default="file_summary,tour_step", help="Page types (comma-separated)")
@@ -585,6 +587,7 @@ def main():
 
     p_duplication = sub.add_parser("duplication", help="Detect code clones via rolling hash")
     p_duplication.add_argument("--window", type=int, default=50, help="Token window size")
+    p_duplication.add_argument("--json", action="store_true", dest="json_output")
 
     p_server = sub.add_parser("serve", help="Start FastAPI server")
     p_server.add_argument("--port", type=int, default=8000, help="Server port")
@@ -691,11 +694,11 @@ def main():
 
     elif args.command in ("knowledge-graph", "kg"):
         from cli.new_commands import knowledge_graph_command as _k
-        _k(project_path)
+        _k(project_path, json_output=getattr(args, 'json_output', False))
 
     elif args.command == "decisions":
         from cli.new_commands import decisions_command as _d
-        _d(project_path, source=args.source)
+        _d(project_path, source=args.source, json_output=getattr(args, 'json_output', False))
 
     elif args.command == "cost":
         from cli.new_commands import cost_command as _c
@@ -703,11 +706,11 @@ def main():
 
     elif args.command == "duplication":
         from cli.new_commands import duplication_command as _dup
-        _dup(project_path, window=args.window)
+        _dup(project_path, window=args.window, json_output=getattr(args, 'json_output', False))
 
     elif args.command == "serve":
         from cli.new_commands import serve_command as _s
-        _s(args.host, args.port)
+        _s(args.host, args.port, project_path=project_path)
 
     elif args.command == "mcp":
         from cli.new_commands import mcp_command as _m
