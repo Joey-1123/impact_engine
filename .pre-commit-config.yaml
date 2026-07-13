@@ -12,9 +12,17 @@ repos:
     rev: v1.24.6
     hooks:
       - id: typos
+        args: [--force-exclude, --exclude, THIRD_PARTY.md]
+        exclude: THIRD_PARTY\.md$
 
   - repo: local
     hooks:
+      - id: no-repowise
+        name: No repowise references in staged files
+        entry: bash -c 'STAGED=$(git diff --cached --name-only --diff-filter=ACM) && [ -z "$STAGED" ] || ! echo "$STAGED" | xargs grep -l repowise 2>/dev/null'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
       - id: impact-engine
         name: Impact Engine pre-commit
         entry: impact-engine pre-commit
